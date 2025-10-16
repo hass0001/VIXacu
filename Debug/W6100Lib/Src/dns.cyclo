@@ -1,0 +1,11 @@
+../W6100Lib/Src/dns.c:127:10:get16	1
+../W6100Lib/Src/dns.c:136:11:put16	1
+../W6100Lib/Src/dns.c:154:5:parse_name	9
+../W6100Lib/Src/dns.c:215:11:dns_question	2
+../W6100Lib/Src/dns.c:241:11:dns_answer	19
+../W6100Lib/Src/dns.c:355:8:parseDNSMSG	13
+../W6100Lib/Src/dns.c:433:9:dns_makequery	4
+../W6100Lib/Src/dns.c:498:8:check_DNS_timeout	3
+../W6100Lib/Src/dns.c:518:6:DNS_init	1
+../W6100Lib/Src/dns.c:526:8:DNS_run	7
+../W6100Lib/Src/dns.c:594:6:DNS_time_handler	1

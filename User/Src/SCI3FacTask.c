@@ -183,7 +183,7 @@ const uint8_t u8arrRegistedCardData2[16] = "\x65\x14\x34\x01\x66\x14\x34\x01\x67
     u16CardResult = 3;//#define Card_Not_Registerd    3
   }
 #else  //
-  u16CardResult = CheckRfCardDataInFlash(u8arrCardData);
+  u16CardResult = CheckRfCardDataInFlash(u8arrCardData, 1);
 #endif
   CheckEventCardAndLog(u8arrCardData[4], u8arrCardData, u16CardResult);
 }

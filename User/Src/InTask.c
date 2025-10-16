@@ -24,7 +24,7 @@ uint16_t u16Sec = 0;
 
 extern IWDG_HandleTypeDef hiwdg;
 uint8_t u8DoorOpendTooLong;
-extern stRtLog stRealtimeLog;
+extern unionRtLog_Parameter stRealtimeLog;
 
 void InputInit(void)
 {
@@ -62,20 +62,25 @@ void InProcess(void)
     gU16IntaskAliveCount ++;    //이건 계속 바뀌어야만 intask가 살아있다는 것이 됨..
     CheckFireAlert();
 	idInput = TACheckJumperSetting();
-/*
-    if( idInput == 0xf0) {
-    	if( nNetPartMode == TA_SERVER ) {
+
+    if( idInput == 0xf0)
+    {
+/*    	if( nNetPartMode == TA_SERVER ) {
     		nNetPartMode = PUSH_CLIENT;
     		OPEN_Ethernet();
     	}
+    }
+    else if( idInput == 0x40) {
+    	FireLockFlag = 99;
+    	FireOccurrence = FALSE;
     }
     else {
     	if( nNetPartMode == PUSH_CLIENT) {
     		nNetPartMode = TA_SERVER;
     		OPEN_Ethernet();
-    	}
+    	}*/
     }
-*/
+
     CheckSensor();   
     CheckButton();         
     CheckTamper();
@@ -169,15 +174,22 @@ void ReleaseLockSelectDoor(INT8U OpenTime, INT8U nLock, INT8U nAuth)
 {
   for(int i = 0; i < MAX_NUM_RELAY; i++)
   { //모델별로 가지고 있는 최대 락까지만 진행함..
-    if((LockParameter.SelectDoor[nLock] << i) & 0x80)
-    {//1234 5678
-      if((nAuth << i) & 0x80)
-      {//1234 5678
-        ControlDoor(OpenTime, i);
-//        LockParameter.DoorTimerSet[i] = OpenTime;
-//        LockParameter.DoorTimerCount[i] = 0;
-      }
-    }
+	if( LockParameter.DoorLockMode[nLock] == LockMode_Manual_Lock)
+	{
+		///  LED Exit On
+	}
+	else
+	{
+		if((LockParameter.SelectDoor[nLock] << i) & 0x80)
+		{//1234 5678
+		  if((nAuth << i) & 0x80)
+		  {//1234 5678
+			ControlDoor(OpenTime, i);
+	//        LockParameter.DoorTimerSet[i] = OpenTime;
+	//        LockParameter.DoorTimerCount[i] = 0;
+		  }
+		}
+	}
   }
 }
 
@@ -192,14 +204,19 @@ void ControlDoor(uint8_t OpenTime, uint8_t nLock){
 //  }
 }
 
-void ChangeLockMode(uint8_t LockMode, uint8_t nLock)  {
-  if(FireOccurrence != TRUE){
-    switch(LockMode)  {
+
+void ChangeLockMode(uint8_t LockMode, uint8_t nLock)
+{
+  if(FireOccurrence != TRUE)
+  {
+    switch(LockMode)
+    {
       case LockMode_Normal ://0x01
       case LockMode_Manual_Unlock ://0x10
       case LockMode_Manual_Lock ://0x11
       case LockMode_Schedule_Unlock ://0x20
-      case LockMode_Schedule_Lock :{//0x21
+      case LockMode_Schedule_Lock :
+      {//0x21
         LockParameter.DoorLockMode[nLock] = LockMode;
         break;
       }
@@ -219,59 +236,61 @@ void ChangeLockMode(uint8_t LockMode, uint8_t nLock)  {
 ******************************************************************************/
 void DoorTimerProcess(void)
 {
-  uint8_t nLock, nCode[3], nWeek, u8LockModeChangeFlag;
-//  INT16U nSchedStartMin, nSchedEndMin, nCurrTimeMin ;
+	uint8_t nLock, nCode[3], nWeek, u8LockModeChangeFlag;
+	//  INT16U nSchedStartMin, nSchedEndMin, nCurrTimeMin ;
 	
-//  nWeek = toDayTime.WeekDAY;
-//  if(gU8HolidayFlag) 	nWeek = 7;  //공휴일 플래그가 걸리면..
-//  else 	nWeek = toDayTime.WeekDAY;
-  nWeek = (gU8HolidayFlag)?7:toDayTime.WeekDAY;//공휴일 플래그가 걸리면..
-  for(nLock=0; nLock < MAX_NUM_DOOR; nLock++)
-  {
-    memcpy(nCode,CMSParameter.DoorTimeCode[nLock],3);//새끼줄 값 가져와서..
-//    for(int i=0; i<3; i++){
-//      nCode[i] = CMSParameter.DoorTimeCode[nLock][i];//새끼줄 값 가져와서..
-//    }
-//    nCode[1] = CMSParameter.DoorTimeCode2[nLock];//새끼줄 값 가져와서..
-//    nCode[2] = CMSParameter.DoorTimeCode3[nLock];//새끼줄 값 가져와서..
-    u8LockModeChangeFlag = LockParameter.DoorLockMode[nLock];
+	//  nWeek = toDayTime.WeekDAY;
+	//  if(gU8HolidayFlag) 	nWeek = 7;  //공휴일 플래그가 걸리면..
+	//  else 	nWeek = toDayTime.WeekDAY;
+	nWeek = (gU8HolidayFlag)?7:toDayTime.WeekDAY;//공휴일 플래그가 걸리면..
+	nWeek = (nWeek >= 7) ? 0: (nWeek+1);
+	for(nLock=0; nLock < MAX_NUM_DOOR; nLock++)
+	{
+		memcpy(nCode,CMSParameter.DoorTimeCode[nLock],3);//새끼줄 값 가져와서..
+		//    for(int i=0; i<3; i++)
+		// 	  {
+		//      nCode[i] = CMSParameter.DoorTimeCode[nLock][i];//새끼줄 값 가져와서..
+		//    }
+		//    nCode[1] = CMSParameter.DoorTimeCode2[nLock];//새끼줄 값 가져와서..
+		//    nCode[2] = CMSParameter.DoorTimeCode3[nLock];//새끼줄 값 가져와서..
+		u8LockModeChangeFlag = LockParameter.DoorLockMode[nLock];
 
-    if((LockParameter.DoorLockMode[nLock] & 0xf0) == 0x20)
-    { // schedule mode이면..
+		if((LockParameter.DoorLockMode[nLock] & 0xf0) == 0x20)
+		{ // schedule mode이면..
 
-      for(int i=0; i < 3; i++)
-      {
-        if(nCode[i] > 0)
-        {//timecode가 있다면.. Check Time And Compare Open Schdule
-          if(CheckInSchedule(ScheduleParameter[nLock][nCode[i]][nWeek].StartHh, ScheduleParameter[nLock][nCode[i]][nWeek].StartMm,
-                             ScheduleParameter[nLock][nCode[i]][nWeek].EndHh, ScheduleParameter[nLock][nCode[i]][nWeek].EndMm))
-          {
-#ifdef DEBUG_MODE
-//			printf( "스케률 인 nLock=%d,nCode=%d,i=%d,week=%d,start=%d:%d, end=%d:%d\r\n", nLock, nCode[i], i, nWeek,
-//					ScheduleParameter[nLock][nCode[i]][nWeek].StartHh,ScheduleParameter[nLock][nCode[i]][nWeek].StartMm,
- //                   ScheduleParameter[nLock][nCode[i]][nWeek].EndHh, ScheduleParameter[nLock][nCode[i]][nWeek].EndMm);
-#endif
-             i=10;//for 문 빠져 나갈 수 있도록..
-            u8LockModeChangeFlag=LockMode_Schedule_Unlock;//ChangeLockMode(LockMode_Schedule_Unlock,nLock);
-          }
-          else
-          {
-            u8LockModeChangeFlag=LockMode_Schedule_Lock;//ChangeLockMode(LockMode_Schedule_Lock,nLock);
-          }
-        }
-        else
-        {//timecode가 없다면..
-          u8LockModeChangeFlag=LockMode_Schedule_Lock;//ChangeLockMode(LockMode_Schedule_Lock,nLock);
-        }
-      }//end for..
-    }//end if..
+			for(int i=0; i < 3; i++)
+			{
+				if(nCode[i] > 0)
+				{//timecode가 있다면.. Check Time And Compare Open Schdule
+					if(CheckInSchedule(ScheduleParameter[nLock][nCode[i]][nWeek].StartHh, ScheduleParameter[nLock][nCode[i]][nWeek].StartMm,
+					ScheduleParameter[nLock][nCode[i]][nWeek].EndHh, ScheduleParameter[nLock][nCode[i]][nWeek].EndMm))
+					{
+				#ifdef DEBUG_MODE
+						printf( "스케률 인 nLock=%d,nCode=%d,i=%d,week=%d,start=%d:%d, end=%d:%d\r\n", nLock, nCode[i], i, nWeek,
+						ScheduleParameter[nLock][nCode[i]][nWeek].StartHh,ScheduleParameter[nLock][nCode[i]][nWeek].StartMm,
+						ScheduleParameter[nLock][nCode[i]][nWeek].EndHh, ScheduleParameter[nLock][nCode[i]][nWeek].EndMm);
+				#endif
+						i=10;//for 문 빠져 나갈 수 있도록..
+						u8LockModeChangeFlag=LockMode_Schedule_Unlock;//ChangeLockMode(LockMode_Schedule_Unlock,nLock);
+					}
+					else
+					{
+						u8LockModeChangeFlag=LockMode_Schedule_Lock;//ChangeLockMode(LockMode_Schedule_Lock,nLock);
+					}
+				}
+				else
+				{//timecode가 없다면..
+					u8LockModeChangeFlag=LockMode_Schedule_Lock;//ChangeLockMode(LockMode_Schedule_Lock,nLock);
+				}
+			}//end for..
+		}//end if..
 
-    if(LockParameter.DoorLockMode[nLock] != u8LockModeChangeFlag)
-    {
-      ChangeLockMode(u8LockModeChangeFlag,nLock);
-    }
-    ExecuteLockOnOff(nLock);
-  }
+		if(LockParameter.DoorLockMode[nLock] != u8LockModeChangeFlag)
+		{
+		  ChangeLockMode(u8LockModeChangeFlag,nLock);
+		}
+		ExecuteLockOnOff(nLock);
+	}
 }
 
 void ExecuteLockOnOff( uint8_t nLock)
@@ -308,13 +327,13 @@ void ExecuteLockOnOff( uint8_t nLock)
       {
         case LockMode_Normal ://0x01
         case LockMode_Manual_Lock ://0x11
-        case LockMode_Schedule_Lock :
+        case LockMode_Schedule_Lock :  // 0x21
         {//0x21
           SetLockOnOff(nLock, false);// Relay off == door is locked..
           break;
         }
         case LockMode_Manual_Unlock ://0x10
-        case LockMode_Schedule_Unlock :
+        case LockMode_Schedule_Unlock :  // 0x20
         {//0x20
           SetLockOnOff(nLock, true); // Relay on == door is unlocked..
           break;
@@ -364,7 +383,7 @@ void CheckSensor(void)
 		CopyYYMMDDhhmmss(TABuf_Tx+TA_INDEX_EVENT_TIME);//funcCopyEventDateTime_to_TABuf_Tx();
 		memcpy(TABuf_Tx + TA_INDEX_EVENT_INPUT, LockParameter.DoorLockMode, 8);
 
-		if( httpc_isConnected)  // http 서버 모드 이면 httpclient로 접속
+//		if( httpc_isConnected)  // http 서버 모드 이면 httpclient로 접속
 		{
 			HTTP_MakeHttpPacketRtLog( SensorIndex, HTTP_EVENT_LONG_OPEN_CODE, HTTP_VERIFYTYPE_EVENT , Result_OK);
 		}
@@ -477,10 +496,17 @@ void ButtonScan( uint8_t nSw)//MAX_NUM_SYSTEM_PORT 8 메모리는 모조리..
     } 
     else
     {//눌려 있다면..
-      LockParameter.DoorTimerCount[nSw] = 0;//시간을 연장.. FW_TACS_STM_V1.4.03_SC_210224.bin       버튼입력이 계속될 때 도어오픈은 계속 연장..
-      ButtonParameter.ButtonCnt[nSw] = 0;
-      ControlDoor(CMSParameter.DoorOpenTime[nSw],  nSw); //버튼은 무조건 열림.. FW_TACS_STM_V1.4.05_SC_210311.bin 에서 추가함
-    }
+		LockParameter.DoorTimerCount[nSw] = 0;//시간을 연장.. FW_TACS_STM_V1.4.03_SC_210224.bin       버튼입력이 계속될 때 도어오픈은 계속 연장..
+		ButtonParameter.ButtonCnt[nSw] = 0;
+		if( LockParameter.DoorLockMode[nSw] == LockMode_Manual_Lock)
+		{
+			///  LED Exit On
+		}
+		else
+		{
+		  ControlDoor(CMSParameter.DoorOpenTime[nSw],  nSw); //버튼은 무조건 열림.. FW_TACS_STM_V1.4.05_SC_210311.bin 에서 추가함
+		}
+	}
   }
   else {
     if(readPort == FALSE)
@@ -494,8 +520,14 @@ void ButtonScan( uint8_t nSw)//MAX_NUM_SYSTEM_PORT 8 메모리는 모조리..
         ButtonParameter.ButtonCnt[nSw] = 0;
         ButtonParameter.Status[nSw] = TRUE;	
 
-        ControlDoor(CMSParameter.DoorOpenTime[nSw],  nSw); //버튼은 무조건 열림..
-
+		if( LockParameter.DoorLockMode[nSw] == LockMode_Manual_Lock)
+		{
+			///  LED Exit On
+		}
+		else
+		{
+			ControlDoor(CMSParameter.DoorOpenTime[nSw],  nSw); //버튼은 무조건 열림..
+		}
         uint32_t nDelayCnt = 0;
         if(gU8LogCountFlag > 0)
         {
@@ -516,14 +548,14 @@ void ButtonScan( uint8_t nSw)//MAX_NUM_SYSTEM_PORT 8 메모리는 모조리..
         SaveEventLog2EEprom_sFlash();//2. log count는 이 함수에서 올림..
 //        gU8LogCountFlag = 0;//멈춤 해제..
         
-    	if( httpc_isConnected)  // http 서버 모드 이면 httpclient로 접속
+//    	if( httpc_isConnected)  // http 서버 모드 이면 httpclient로 접속
     	{
     		HTTP_MakeHttpPacketRtLog( nSw, HTTP_EVENT_EXIT_CODE, HTTP_VERIFYTYPE_EVENT , Result_OK);
     	}
     //							// 소켓통신 TCP/IP 인터페이스로 접속
 		if(TASocketConnected > 0)
 		{// 커넥트 되어 있고 패킷전송할게 있으면.. 업뎃중이면 안해야 하지 않을까?
-		  TAMakeResponsePacket(TA_StrCmdAckEvent);//TA_StrCmdGetEvent  0x4542  //  ("EB")  //  EVENT UPLOAD
+		  TAMakeResponsePacket(TA_StrCmdAckEvent); //  ("EA")  //  EVENT ping Ack.. EB �޽����� ���������.. //TA_StrCmdGetEvent  0x4542  //  ("EB")  //  EVENT UPLOAD
 		}
       }
       else
@@ -596,9 +628,15 @@ void CheckFireAlert(void)
           FireOccurrence = 99;//화재인데 화재작동 안하는 경우는 여기에 해당함.. 노말모드로..
         }
 
-    	if( httpc_isConnected)  // http 서버 모드 이면 httpclient로 접속에서 연결되었으면 보내는 걸로 바꿈.
+//    	if( httpc_isConnected)  // http 서버 모드 이면 httpclient로 접속에서 연결되었으면 보내는 걸로 바꿈.
     	{
-			HTTP_MakeHttpPacketRtLog( 0, HTTP_EVENT_FIRE_CODE, HTTP_VERIFYTYPE_EVENT, Result_OK);
+    		printf("Rtlog 생성 Fire Alert: %d Event %d\n\r", HTTP_EVENT_FIRE_CODE, HTTP_VERIFYTYPE_EVENT);
+
+/*
+#ifdef DEBUG_MODE
+#endif
+*/
+    		HTTP_MakeHttpPacketRtLog( 0, HTTP_EVENT_FIRE_CODE, HTTP_VERIFYTYPE_EVENT, Result_OK);
     	}
 //    	else						// 소켓통신 TCP/IP 인터페이스로 접속
     	{
@@ -673,7 +711,7 @@ void CheckTamper(void)
         memcpy(TABuf_Tx + TA_INDEX_EVENT_INPUT, LockParameter.DoorLockMode, 8);
 
 
-    	if( httpc_isConnected)  // http 서버 모드 이면 httpclient로 접속
+//    	if( httpc_isConnected)  // http 서버 모드 이면 httpclient로 접속
     	{
     		HTTP_MakeHttpPacketRtLog( readPort, HTTP_EVENT_TAMPER_CODE, HTTP_VERIFYTYPE_TAMPER , Result_OK);
     	}
@@ -719,8 +757,14 @@ void SetLockOnOff( uint8_t NoRelay, bool bON)
   uint16_t gRelayPin[MAX_NUM_RELAY]       = {RELAY1_Pin,       RELAY2_Pin,       RELAY4_Pin,       RELAY3_Pin,       ALARM_C6_Pin,       ALARM_G8_Pin};
   GPIO_TypeDef *gRelayPort[MAX_NUM_RELAY] = {RELAY1_GPIO_Port, RELAY2_GPIO_Port, RELAY4_GPIO_Port, RELAY3_GPIO_Port, ALARM_C6_GPIO_Port, ALARM_G8_GPIO_Port};
 
+
   if(bON)
   {
+#ifdef DEBUG_MODE
+	  if( NoRelay == 2 && LockParameter.DoorLockMode[2] == LockMode_Manual_Lock)
+		  printf( "SetLockOnOff NoRelay %02X, bON=%02X\r\n", NoRelay, bON);
+#endif
+
 	  HAL_GPIO_WritePin(gRelayPort[NoRelay % MAX_NUM_RELAY], gRelayPin[NoRelay % MAX_NUM_RELAY], GPIO_PIN_SET);// Relay1 On
   }
   else
@@ -772,7 +816,7 @@ void GetScheduleData(INT8U nLock, INT8U nCode)
 	for( nWeek = 0; nWeek < MAX_NUM_WEEK_HOLIDAY; nWeek++)
 	{
 
-#ifdef DEBUG_MODE
+#ifdef xDEBUG_MODE
 			printf( "GetScheduleData startAddr=%08X+%d, nWeek=%02X\r\n", startAddr, i , nWeek);
 #endif
 
@@ -802,7 +846,7 @@ void LoadScheduleData(void)
 		{
 			for( nWeek = 0; nWeek < MAX_NUM_WEEK_HOLIDAY; nWeek++)
 			{
-#ifdef DEBUG_MODE
+#ifdef xDEBUG_MODE
 			printf( "GetScheduleData startAddr=%08X+%d, nLock=%d, nCode=%d, nWeek=%d, ", startAddr, i , nLock, nCode,nWeek);
 #endif
 				xREAD_DataFromExNorFlash(startAddr+i,&ScheduleParameter[nLock][nCode][nWeek].StartHh, 1);
@@ -813,7 +857,7 @@ void LoadScheduleData(void)
 				i++;
 				xREAD_DataFromExNorFlash(startAddr+i,&ScheduleParameter[nLock][nCode][nWeek].EndMm, 1);
 				i++;
-#ifdef DEBUG_MODE
+#ifdef xDEBUG_MODE
 			printf( "Schedule start=%d:%d, End=%d:%d\r\n",
 					ScheduleParameter[nLock][nCode][nWeek].StartHh,	ScheduleParameter[nLock][nCode][nWeek].StartMm,
 					ScheduleParameter[nLock][nCode][nWeek].EndHh,   ScheduleParameter[nLock][nCode][nWeek].EndMm);
@@ -835,7 +879,7 @@ void SaveScheduleData(void)
 	for( ulFor = 0; ulFor < QSPI_SUBSECTOR_SIZE; ulFor+=MX25L51245G_PAGE_SIZE)
 	{
 
-#ifdef DEBUG_MODE
+#ifdef xDEBUG_MODE
 			printf( "SaveScheduleData wrAddr=%08X, ulFor=%04X, addr=%08X\r\n", wrAddr , ulFor, (rdAddr+ulFor) );
 #endif
 		xWRITE_DataToExNorFlash(wrAddr, (uint8_t*)(rdAddr+ulFor), MX25L51245G_PAGE_SIZE);
@@ -850,3 +894,5 @@ void ResetDoorStatus(void)
 //  memset(LockParameter.DoorLockMode,0,  MAX_NUM_SYSTEM_PORT);//초기화는 이해 안됨..
 //  memset(LockParameter.SelectDoor,0,    MAX_NUM_SYSTEM_PORT);//초기화는 이해 안됨..
 }
+
+

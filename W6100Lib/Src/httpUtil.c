@@ -21,6 +21,9 @@
 extern _HTTPC_GetPostTypeDef HTTP_RestCmd[MAX_NUM_DOOR];
 
 uint8_t Door1ValidTZ;
+uint16_t  nUserSyncCount, nTotalSyncCount;
+
+unionCard_Parameter UseCard;
 
 uint8_t http_get_cgi_handler(uint8_t * uri_name, uint8_t * buf, uint32_t * file_len)
 {
@@ -159,8 +162,7 @@ void Httpc_TreatUpgrade( uint8_t * recvBuf, uint16_t recvLen)
 	uint8_t * ptrSize;
 
 //		 nHttpcCmd = 384;
-	memcpy(HTTP_RestCmd[HttpcSubModeStep].Httpc_Command, "UPGRADE", 7 );
-
+	sprintf(HTTP_RestCmd[HttpcSubModeStep].Httpc_Command, "UPGRADE");
 	ptrChecksum = strstr( (char const*)recvBuf, "checksum");
 	if( ptrChecksum != NULL)
 	{
@@ -198,7 +200,7 @@ void Httpc_TreatUpgrade( uint8_t * recvBuf, uint16_t recvLen)
 	}
 	else  // Upgrade CMD No 첵섬 에러
 	{
-		HTTP_RestCmd[HttpcSubModeStep].nHttpcReturn = -19;
+		HTTP_RestCmd[HttpcSubModeStep].nHttpcReturn = -29;
 	}
 	SET_HTTPC_HeartType(UHS_Type_SendCmdReturn);
 }
@@ -211,8 +213,12 @@ void Httpc_TreatControlDevice( uint8_t * recvBuf, uint16_t recvLen)
 	uint8_t * ptrDevice;
 	uint16_t nPtrSize;
 
+	nUserSyncCount = 0;   // 초기화
+	nTotalSyncCount = 0;
+
 	 ptrId = strstr( (char const*)recvBuf, "C:");
 	 memcpy(HTTP_RestCmd[HttpcSubModeStep].chrHttpcCmd, ptrId+2, 17);
+	 HTTP_RestCmd[HttpcSubModeStep].chrHttpcCmd[17] = 0;
 	 sprintf(HTTP_RestCmd[HttpcSubModeStep].Httpc_Command, "CONTROL DEVICE");
 	 ptrDevice = strstr( (char const*)recvBuf, "DEVICE");
     if( ptrDevice != NULL)
@@ -279,6 +285,8 @@ void Httpc_TreatControlDevice( uint8_t * recvBuf, uint16_t recvLen)
 		else if( HTTP_RestCmd[HttpcSubModeStep].Httpc_Checksum[0] == '0' &&
 				 HTTP_RestCmd[HttpcSubModeStep].Httpc_Checksum[1] == '6' )
 		{  // Control Normal Lock
+//		| CONTROL DEVICE_2:CONTROL DEVICE 04010000  // 만 오면 LockMode_Schedule_Lock
+//		| CONTROL DEVICE_2:CONTROL DEVICE 06010100
 			if(  HTTP_RestCmd[HttpcSubModeStep].Httpc_Checksum[5] == '1' )
 			{  //수동 잠김  // 06010100
 				ChangeLockMode( LockMode_Manual_Lock, HttpcSubModeStep);
@@ -306,7 +314,7 @@ void Httpc_TreatControlDevice( uint8_t * recvBuf, uint16_t recvLen)
     }
     else  // Upgrade CMD No 첵섬 에러
     {
-   	 HTTP_RestCmd[HttpcSubModeStep].nHttpcReturn = -19;
+   	 HTTP_RestCmd[HttpcSubModeStep].nHttpcReturn = -30;
     }
 	 SET_HTTPC_HeartType(UHS_Type_SendCmdReturn);
 }
@@ -319,9 +327,11 @@ void Httpc_TreatDataDelete( uint8_t * recvBuf, uint16_t recvLen)
  	uint8_t * ptrCmd;
 	uint8_t * ptrDevice;
 	uint16_t nPtrSize;
+	unionCard_Parameter UseCard;
 
 	ptrCmd = strstr( (char const*)recvBuf, "C:");   // C:20250326105130643:DATA DELETE user Cardno=896106578
 	memcpy(HTTP_RestCmd[HttpcSubModeStep].chrHttpcCmd, ptrCmd+2, 17);  // 커맨드 ID
+    HTTP_RestCmd[HttpcSubModeStep].chrHttpcCmd[17] = 0;
 	sprintf(HTTP_RestCmd[HttpcSubModeStep].Httpc_Command, "DATA DELETE");
 
 	if((ptr = strstr( (char const*)recvBuf, "userauthorize")) != NULL)
@@ -333,7 +343,7 @@ void Httpc_TreatDataDelete( uint8_t * recvBuf, uint16_t recvLen)
 				// 권한 지움  DATA DELETE user Cardno=89610578
 				uint8_t tempStr[16];
 				nPtrSize = ptrCmd - (ptrId+4) - 1; // 변수 사이에 탬이 하나씩 있슴.
-				memcpy( CardParameter.stParam.Pin, ptrId+4, nPtrSize);
+				memcpy( UseCard.stParam.Pin, ptrId+4, nPtrSize);
 
 				ptrDevice = ptrCmd + 7;
 				nPtrSize = recvLen - (uint16_t)(ptrDevice-recvBuf);
@@ -342,17 +352,22 @@ void Httpc_TreatDataDelete( uint8_t * recvBuf, uint16_t recvLen)
 					memcpy( tempStr, ptrDevice, nPtrSize);
 				else
 					memcpy( tempStr, ptrDevice, 8);  // Card number  ??
-
-				CardParameter.stParam.CardId[0] = (A2H(tempStr[0])*0x10) + A2H(tempStr[1]);
-				CardParameter.stParam.CardId[1] = (A2H(tempStr[2])*0x10) + A2H(tempStr[3]);
-				CardParameter.stParam.CardId[2] = (A2H(tempStr[4])*0x10) + A2H(tempStr[5]);
-				CardParameter.stParam.CardId[3] = (A2H(tempStr[6])*0x10) + A2H(tempStr[7]);
-
-				 DeleteAuthorityFromSerialFlash( CardParameter.stParam.Pin, CardParameter.stParam.CardId, HttpcSubModeStep);
+#ifdef CARD_2301_ORDER
+				UseCard.stParam.CardId[0] = (A2H(tempStr[4])*0x10) + A2H(tempStr[5]);
+				UseCard.stParam.CardId[1] = (A2H(tempStr[6])*0x10) + A2H(tempStr[7]);
+				UseCard.stParam.CardId[2] = (A2H(tempStr[0])*0x10) + A2H(tempStr[1]);
+				UseCard.stParam.CardId[3] = (A2H(tempStr[2])*0x10) + A2H(tempStr[3]);
+#else  // CARD 0123 순서
+				UseCard.stParam.CardId[0] = (A2H(tempStr[0])*0x10) + A2H(tempStr[1]);
+				UseCard.stParam.CardId[1] = (A2H(tempStr[2])*0x10) + A2H(tempStr[3]);
+				UseCard.stParam.CardId[2] = (A2H(tempStr[4])*0x10) + A2H(tempStr[5]);
+				UseCard.stParam.CardId[3] = (A2H(tempStr[6])*0x10) + A2H(tempStr[7]);
+#endif
+				 DeleteAuthorityFromSerialFlash( UseCard.stParam.Pin, UseCard.stParam.CardId, HttpcSubModeStep);
 			}
 		}
  		HTTP_RestCmd[HttpcSubModeStep].nHttpcReturn = 0;
-   }
+    }
 	else if ((ptr = strstr( (char const*)recvBuf, "user")) != NULL)
 	{
 		if ((ptrDevice = strstr( (char const*)recvBuf, "Cardno=")) != NULL)
@@ -366,18 +381,24 @@ void Httpc_TreatDataDelete( uint8_t * recvBuf, uint16_t recvLen)
 			else
 				memcpy(tempStr, ptrCmd, 8);   // Card number  ??
 
-			CardParameter.stParam.CardId[0] = (A2H(tempStr[0])*0x10) + A2H(tempStr[1]);
-			CardParameter.stParam.CardId[1] = (A2H(tempStr[2])*0x10) + A2H(tempStr[3]);
-			CardParameter.stParam.CardId[2] = (A2H(tempStr[4])*0x10) + A2H(tempStr[5]);
-			CardParameter.stParam.CardId[3] = (A2H(tempStr[6])*0x10) + A2H(tempStr[7]);
-
-			DeleteRfCardDataOnSerialFlash( CardParameter.stParam.CardId, 1);
+#ifdef CARD_2301_ORDER
+				UseCard.stParam.CardId[0] = (A2H(tempStr[4])*0x10) + A2H(tempStr[5]);
+				UseCard.stParam.CardId[1] = (A2H(tempStr[6])*0x10) + A2H(tempStr[7]);
+				UseCard.stParam.CardId[2] = (A2H(tempStr[0])*0x10) + A2H(tempStr[1]);
+				UseCard.stParam.CardId[3] = (A2H(tempStr[2])*0x10) + A2H(tempStr[3]);
+#else  // CARD 0123 순서
+				UseCard.stParam.CardId[0] = (A2H(tempStr[0])*0x10) + A2H(tempStr[1]);
+				UseCard.stParam.CardId[1] = (A2H(tempStr[2])*0x10) + A2H(tempStr[3]);
+				UseCard.stParam.CardId[2] = (A2H(tempStr[4])*0x10) + A2H(tempStr[5]);
+				UseCard.stParam.CardId[3] = (A2H(tempStr[6])*0x10) + A2H(tempStr[7]);
+#endif
+			DeleteRfCardDataOnSerialFlash( UseCard.stParam.CardId, 1);
 		}
 		HTTP_RestCmd[HttpcSubModeStep].nHttpcReturn = 0;
 	}
     else  // Upgrade CMD No 첵섬 에러
     {
-		HTTP_RestCmd[HttpcSubModeStep].nHttpcReturn = -19;
+		HTTP_RestCmd[HttpcSubModeStep].nHttpcReturn = -31;
     }
     SET_HTTPC_HeartType(UHS_Type_SendCmdReturn);
 }
@@ -393,6 +414,7 @@ void Httpc_TreatSetOption( uint8_t * recvBuf, uint16_t recvLen)
 //    		printf("1C %s\r\n", recvBuf);
 	ptrId = strstr( (char const*)recvBuf, "C:");
 	memcpy(HTTP_RestCmd[HttpcSubModeStep].chrHttpcCmd, ptrId+2, 17);
+	 HTTP_RestCmd[HttpcSubModeStep].chrHttpcCmd[17] = 0;
 	sprintf(HTTP_RestCmd[HttpcSubModeStep].Httpc_Command, "SET OPTIONS");
 
 	if( (ptrDevice = strstr( (char const*)recvBuf, "DateTime")) != NULL)
@@ -449,8 +471,11 @@ void Httpc_TreatDataUpdate( uint8_t * recvBuf, uint16_t recvLen)
 	uint8_t * ptrDevice;
 	uint16_t nPtrSize;
 
+	nTotalSyncCount++;
+
 	ptrId = strstr( (char const*)recvBuf, "C:");   // C:20250326105130643:DATA UPDATE user Cardno=896106578
 	memcpy(HTTP_RestCmd[HttpcSubModeStep].chrHttpcCmd, ptrId+2, 17);  // 커맨드 ID
+	 HTTP_RestCmd[HttpcSubModeStep].chrHttpcCmd[17] = 0;
 	sprintf(HTTP_RestCmd[HttpcSubModeStep].Httpc_Command, "DATA UPDATE");
 
 	ptrDevice = strstr( (char const*)recvBuf, "userauthorize");
@@ -464,30 +489,61 @@ void Httpc_TreatDataUpdate( uint8_t * recvBuf, uint16_t recvLen)
 			{
 				ptrDevice = ptrId + 4;
 				nPtrSize = ptrCmd- ptrDevice-1; // 변수 사이에 탬이 하나씩 있슴.
-				if(( nPtrSize > 0) && (nPtrSize < 9))
+				if( nPtrSize == 0)
+				{
+					memcpy(UseCard.stParam.Pin,"JD0001", 6);   // Pin
+				}
+				else if((nPtrSize > 0 )&& (nPtrSize < 9))
 				{  // 사용자 카드 업데이트
-					memcpy(CardParameter.stParam.Pin, ptrDevice, nPtrSize);   // Pin
+					memcpy(UseCard.stParam.Pin, ptrDevice, nPtrSize);   // Pin
+				}
+				else
+				{
+					memcpy(UseCard.stParam.Pin, ptrDevice, 8);   // Pin
+				}
 
-					ptrCmd = strstr( (char const*)recvBuf, "CardNo=");
-					if( ptrCmd != NULL)
-					{
-						uint8_t tempStr[16];
-						ptrId = ptrCmd + 7;
-						nPtrSize = 8; // 카드번호 8자리.
-						memcpy(tempStr, ptrId, nPtrSize);   // Card number
+				ptrCmd = strstr( (char const*)recvBuf, "CardNo=");
+				if( ptrCmd != NULL)
+				{
+					uint8_t tempStr[16];
+					ptrId = ptrCmd + 7;
+					nPtrSize = 8; // 카드번호 8자리.
+					memcpy(tempStr, ptrId, nPtrSize);   // Card number
 
-						CardParameter.stParam.CardId[0] = (A2H(tempStr[0])*0x10) + A2H(tempStr[1]);
-						CardParameter.stParam.CardId[1] = (A2H(tempStr[2])*0x10) + A2H(tempStr[3]);
-						CardParameter.stParam.CardId[2] = (A2H(tempStr[4])*0x10) + A2H(tempStr[5]);
-						CardParameter.stParam.CardId[3] = (A2H(tempStr[6])*0x10) + A2H(tempStr[7]);
-#ifdef DEBUG_MODE
-						printf( "Result Card%02X%02X%02X%002X,Pin%02X%02X%02X%02X%02X%02X%02X%02X\r\n",
-								CardParameter.stParam.CardId[0], CardParameter.stParam.CardId[1], CardParameter.stParam.CardId[2], CardParameter.stParam.CardId[3],
-								CardParameter.stParam.Pin[0], CardParameter.stParam.Pin[1],CardParameter.stParam.Pin[2],CardParameter.stParam.Pin[3],
-								CardParameter.stParam.Pin[4],CardParameter.stParam.Pin[5],CardParameter.stParam.Pin[6],CardParameter.stParam.Pin[7]);
+#ifdef CARD_2301_ORDER
+				UseCard.stParam.CardId[0] = (A2H(tempStr[4])*0x10) + A2H(tempStr[5]);
+				UseCard.stParam.CardId[1] = (A2H(tempStr[6])*0x10) + A2H(tempStr[7]);
+				UseCard.stParam.CardId[2] = (A2H(tempStr[0])*0x10) + A2H(tempStr[1]);
+				UseCard.stParam.CardId[3] = (A2H(tempStr[2])*0x10) + A2H(tempStr[3]);
+#else  // CARD 0123 순서
+				UseCard.stParam.CardId[0] = (A2H(tempStr[0])*0x10) + A2H(tempStr[1]);
+				UseCard.stParam.CardId[1] = (A2H(tempStr[2])*0x10) + A2H(tempStr[3]);
+				UseCard.stParam.CardId[2] = (A2H(tempStr[4])*0x10) + A2H(tempStr[5]);
+				UseCard.stParam.CardId[3] = (A2H(tempStr[6])*0x10) + A2H(tempStr[7]);
 #endif
-						AddAuthorityToSerialFlash( CardParameter.stParam.Pin, CardParameter.stParam.CardId, HttpcSubModeStep);
+#ifdef SYNC_DEBUG
+					printf( "Httpc_TreatDataUpdate Result Card=%02X%02X%02X%002X,Pin=%02X%02X%02X%02X%02X%02X%02X%02X\r\n",
+							UseCard.stParam.CardId[0], UseCard.stParam.CardId[1], UseCard.stParam.CardId[2], UseCard.stParam.CardId[3],
+							UseCard.stParam.Pin[0], UseCard.stParam.Pin[1],UseCard.stParam.Pin[2],UseCard.stParam.Pin[3],
+							UseCard.stParam.Pin[4],UseCard.stParam.Pin[5],UseCard.stParam.Pin[6],UseCard.stParam.Pin[7]);
+#endif
+					uint8_t nReturn = AddAuthorityToSerialFlash( UseCard.stParam.Pin, UseCard.stParam.CardId, HttpcSubModeStep);
+					switch( nReturn)
+					{
+					case Card_Registerd_OK:
+						printf( "DATA UPDATE userauthorize Card_Registerd_OK!\n\r");
+						break;
+					case Card_No_Space:
+						printf( "DATA UPDATE userauthorize Card_No_Space!\n\r");
+						break;
+					default:
+						printf( "DATA UPDATE userauthorize Error!\n\r");
+						break;
 					}
+					printf( "Card=%02X%02X%02X%002X,Pin=%02X%02X%02X%02X%02X%02X%02X%02X\r\n",
+					UseCard.stParam.CardId[0], UseCard.stParam.CardId[1], UseCard.stParam.CardId[2], UseCard.stParam.CardId[3],
+					UseCard.stParam.Pin[0], UseCard.stParam.Pin[1],UseCard.stParam.Pin[2],UseCard.stParam.Pin[3],
+					UseCard.stParam.Pin[4],UseCard.stParam.Pin[5],UseCard.stParam.Pin[6],UseCard.stParam.Pin[7]);
 				}
 			}
 		}
@@ -495,55 +551,98 @@ void Httpc_TreatDataUpdate( uint8_t * recvBuf, uint16_t recvLen)
 	}
     else if( (ptrDevice = strstr( (char const*)recvBuf, "user CardNo")) != NULL)
     {
-		memset( CardParameter.u8strParam, 0, 16);
+    	nUserSyncCount++;
+		memset( UseCard.u8strParam, 0, 16);
+
 		uint8_t tempStr[16];
 		ptrCmd = ptrDevice+12;
 		ptrId = strstr( (char const*)recvBuf, "Pin=");
 		if( ptrId != NULL)
 		{
+			 // 사용자 카드 업데이트
 			nPtrSize = ptrId - ptrCmd -1;   // 변수 사이에 탬이 하나씩 있슴.
-			if(( nPtrSize > 0) && (nPtrSize < 9))
+			if( nPtrSize == 0)
+			{
+				memcpy(tempStr, "12345678", 8);   // Card number
+			}
+			else if((nPtrSize > 0 )&& (nPtrSize < 9))
 			{  // 사용자 카드 업데이트
 				memcpy(tempStr, ptrCmd, nPtrSize);   // Card number
+			}
+			else
+			{
+				memcpy(tempStr, ptrCmd, 8);   // Card number
+			}
 
-				CardParameter.stParam.CardId[0] = (A2H(tempStr[0])*0x10) + A2H(tempStr[1]);
-				CardParameter.stParam.CardId[1] = (A2H(tempStr[2])*0x10) + A2H(tempStr[3]);
-				CardParameter.stParam.CardId[2] = (A2H(tempStr[4])*0x10) + A2H(tempStr[5]);
-				CardParameter.stParam.CardId[3] = (A2H(tempStr[6])*0x10) + A2H(tempStr[7]);
 
+#ifdef CARD_2301_ORDER
+				UseCard.stParam.CardId[0] = (A2H(tempStr[4])*0x10) + A2H(tempStr[5]);
+				UseCard.stParam.CardId[1] = (A2H(tempStr[6])*0x10) + A2H(tempStr[7]);
+				UseCard.stParam.CardId[2] = (A2H(tempStr[0])*0x10) + A2H(tempStr[1]);
+				UseCard.stParam.CardId[3] = (A2H(tempStr[2])*0x10) + A2H(tempStr[3]);
+#else  // CARD 0123 순서
+				UseCard.stParam.CardId[0] = (A2H(tempStr[0])*0x10) + A2H(tempStr[1]);
+				UseCard.stParam.CardId[1] = (A2H(tempStr[2])*0x10) + A2H(tempStr[3]);
+				UseCard.stParam.CardId[2] = (A2H(tempStr[4])*0x10) + A2H(tempStr[5]);
+				UseCard.stParam.CardId[3] = (A2H(tempStr[6])*0x10) + A2H(tempStr[7]);
+#endif
+
+		printf("DATA UPDATE USER Count: %d,  All: %d\n\r", nUserSyncCount, nTotalSyncCount);
 				ptrCmd = strstr( (char const*)recvBuf, "Password=");
 				if( ptrCmd != NULL)
 				{
 					ptrDevice = ptrId + 4;
 					nPtrSize = ptrCmd-ptrDevice-1; // 변수 사이에 탬이 하나씩 있슴.
-					memcpy(CardParameter.stParam.Pin, ptrDevice, nPtrSize);   // Pin=
 
-#ifdef DEBUG_MODE
+					if( nPtrSize == 0)
+					{
+						memcpy(UseCard.stParam.Pin,"JD0001", 6);   // Pin
+					}
+					else if((nPtrSize > 0 )&& (nPtrSize < 9))
+					{  // 사용자 카드 업데이트
+						memcpy(UseCard.stParam.Pin, ptrDevice, nPtrSize);   // Pin
+					}
+					else
+					{
+						memcpy(UseCard.stParam.Pin, ptrDevice, 8);   // Pin
+					}
+
+#ifdef LOG_DEBUG
 					printf( "Result Card%02X%02X%02X%002X,Pin%02X%02X%02X%02X%02X%02X%02X%02X\r\n",
-						CardParameter.stParam.CardId[0], CardParameter.stParam.CardId[1], CardParameter.stParam.CardId[2], CardParameter.stParam.CardId[3],
-						CardParameter.stParam.Pin[0],    CardParameter.stParam.Pin[1],    CardParameter.stParam.Pin[2],    CardParameter.stParam.Pin[3],
-						CardParameter.stParam.Pin[4],    CardParameter.stParam.Pin[5],    CardParameter.stParam.Pin[6],    CardParameter.stParam.Pin[7]);
+							UseCard.stParam.CardId[0], UseCard.stParam.CardId[1], UseCard.stParam.CardId[2], UseCard.stParam.CardId[3],
+							UseCard.stParam.Pin[0],    UseCard.stParam.Pin[1],    UseCard.stParam.Pin[2],    UseCard.stParam.Pin[3],
+							UseCard.stParam.Pin[4],    UseCard.stParam.Pin[5],    UseCard.stParam.Pin[6],    UseCard.stParam.Pin[7]);
 #endif
 				}
 
 				//TA_INDEX_DAT 7, 총 16바이트 카드데이터 중 카드 4바이트 방식은 0~11 : 0으로 채워서 옴
-				CardParameter.stParam.DoorAuth_CardKind = 0xF1;  //  All door 1111 권한  || 1:상시 ID.  2:일시 ID.  3:당일카드 ID.
-				CardParameter.stParam.PassCode[0] = 0x99; // 사용기한 자리에 지정카드용 ACU 번호가 두개 들어감
-				CardParameter.stParam.PassCode[1] = 0x31; // 사용기한 자리에 지정카드용 ACU 번호가 두개 들어감
-				CardParameter.stParam.Location = 2;
+#ifdef GUUI_PULLMAN_485
+				UseCard.stParam.DoorAuth_CardKind = 0xF1;  //  All door 1111 권한  || 1:상시 ID.  2:일시 ID.  3:당일카드 ID.
+#endif
+#ifdef KTWEST_WIEGAND
+				UseCard.stParam.DoorAuth_CardKind = ((0x80 >> HttpcSubModeStep) + 0x01);  //  All door 1111 권한  || 1:상시 ID.  2:일시 ID.  3:당일카드 ID.
+#endif
+				UseCard.stParam.PassCode[0] = 0x99; // 사용기한 자리에 지정카드용 ACU 번호가 두개 들어감
+				UseCard.stParam.PassCode[1] = 0x31; // 사용기한 자리에 지정카드용 ACU 번호가 두개 들어감
+				UseCard.stParam.Location = 2;
 
-				uint8_t nResult = WriteRfCardDataToSerialFlash(CardParameter.u8strParam);
-			   /*
-			   #define Card_Registerd_OK     0
-			   #define Card_No_Granted    	 1
-
-			   #define Card_Deleted_OK   	 0
-			   #define Card_No_Space         1
-			   #define Card_Already_Exist    2
-			   #define Card_Not_Registerd    3
-			   #define Card_Error_Registerd  4
-			   */
-			}
+				uint8_t nResult = WriteRfCardDataToSerialFlash(UseCard.u8strParam);
+				switch( nResult)
+				{
+				case Card_Registerd_OK:
+					printf( "DATA UPDATE user update Card_Registerd_OK!\n\r");
+					break;
+				case Card_No_Space:
+					printf( "DATA UPDATE user update Card_No_Space!\n\r");
+					break;
+				default:
+					printf( "DATA UPDATE user update Error!\n\r");
+					break;
+				}
+				printf( "Card=%02X%02X%02X%002X,Pin=%02X%02X%02X%02X%02X%02X%02X%02X\r\n",
+				UseCard.stParam.CardId[0], UseCard.stParam.CardId[1], UseCard.stParam.CardId[2], UseCard.stParam.CardId[3],
+				UseCard.stParam.Pin[0], UseCard.stParam.Pin[1],UseCard.stParam.Pin[2],UseCard.stParam.Pin[3],
+				UseCard.stParam.Pin[4],UseCard.stParam.Pin[5],UseCard.stParam.Pin[6],UseCard.stParam.Pin[7]);
 		}
  		HTTP_RestCmd[HttpcSubModeStep].nHttpcReturn = 0;
     }
@@ -621,45 +720,45 @@ void Httpc_TreatDataUpdate( uint8_t * recvBuf, uint16_t recvLen)
 										}
 										else
 										{
-											HTTP_RestCmd[HttpcSubModeStep].nHttpcReturn = -19;
+											HTTP_RestCmd[HttpcSubModeStep].nHttpcReturn = -32;
 										}
 									}
 									else
 									{
-										HTTP_RestCmd[HttpcSubModeStep].nHttpcReturn = -19;
+										HTTP_RestCmd[HttpcSubModeStep].nHttpcReturn = -33;
 									}
 								}
 								else
 								{
-									HTTP_RestCmd[HttpcSubModeStep].nHttpcReturn = -19;
+									HTTP_RestCmd[HttpcSubModeStep].nHttpcReturn = -34;
 								}
 							}
 							else
 							{
-								HTTP_RestCmd[HttpcSubModeStep].nHttpcReturn = -19;
+								HTTP_RestCmd[HttpcSubModeStep].nHttpcReturn = -35;
 							}
 						}
 						else
 						{
-							HTTP_RestCmd[HttpcSubModeStep].nHttpcReturn = -19;
+							HTTP_RestCmd[HttpcSubModeStep].nHttpcReturn = -36;
 						}
 					}
 					else
 					{
-						HTTP_RestCmd[HttpcSubModeStep].nHttpcReturn = -19;
+						HTTP_RestCmd[HttpcSubModeStep].nHttpcReturn = -37;
 					}
 				}
 				else
 				{
-					HTTP_RestCmd[HttpcSubModeStep].nHttpcReturn = -19;
+					HTTP_RestCmd[HttpcSubModeStep].nHttpcReturn = -38;
 				}
 			}
 			else
 			{
-				HTTP_RestCmd[HttpcSubModeStep].nHttpcReturn = -19;
+				HTTP_RestCmd[HttpcSubModeStep].nHttpcReturn = -39;
 			}
 
-#ifdef DEBUG_MODE
+#ifdef xDEBUG_MODE
 			printf( "timezone Door = %d\r\n", HttpcSubModeStep);
 #endif
 
@@ -669,7 +768,7 @@ void Httpc_TreatDataUpdate( uint8_t * recvBuf, uint16_t recvLen)
 				CMSParameter.DoorTimeCode[HttpcSubModeStep][i] = 2;    // 1,2,3       MAX_NUM_TIMECODE 128
 				EEPROMSetData((INT16U)(E2P_Para_CMS + EEPROM_PARAM_INDEX_DOORTIMECODE  + HttpcSubModeStep * 3 + i), CMSParameter.DoorTimeCode[HttpcSubModeStep][i]);
 
-#ifdef DEBUG_MODE
+#ifdef xDEBUG_MODE
 			printf( "timezone Timecode = %d, Value=%d\r\n", i , CMSParameter.DoorTimeCode[HttpcSubModeStep][i]);
 #endif
 			}
@@ -684,7 +783,7 @@ void Httpc_TreatDataUpdate( uint8_t * recvBuf, uint16_t recvLen)
 				ScheduleParameter[HttpcSubModeStep][2][ni].EndHh =   endHour;//EndHh;
 				ScheduleParameter[HttpcSubModeStep][2][ni].EndMm =   endMin;//EndMm;
 
-#ifdef DEBUG_MODE
+#ifdef xDEBUG_MODE
 			printf( "timezone schedule = start=%d:%d, end=%d:%d\r\n",
 					ScheduleParameter[HttpcSubModeStep][2][ni].StartHh, ScheduleParameter[HttpcSubModeStep][2][ni].StartMm,
 					ScheduleParameter[HttpcSubModeStep][2][ni].EndHh, 	ScheduleParameter[HttpcSubModeStep][2][ni].EndMm);
@@ -696,12 +795,13 @@ void Httpc_TreatDataUpdate( uint8_t * recvBuf, uint16_t recvLen)
 		}
 		else
 		{
-			HTTP_RestCmd[HttpcSubModeStep].nHttpcReturn = -19;
+			HTTP_RestCmd[HttpcSubModeStep].nHttpcReturn = -40;
 		}
 	}
     else  // Upgrade CMD No 첵섬 에러
     {
-		HTTP_RestCmd[HttpcSubModeStep].nHttpcReturn = -19;
+		printf( "Server Notice Error %s\r\n",recvBuf);
+		HTTP_RestCmd[HttpcSubModeStep].nHttpcReturn = 0;  // BIOPHOTO 커맨드는 바로 성공
     }
 	SET_HTTPC_HeartType(UHS_Type_SendCmdReturn);
 }

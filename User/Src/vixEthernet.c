@@ -111,7 +111,7 @@ void OPEN_Ethernet(void)
 	fOpenEthernet = 1;
 	//DHCPv4_init(0, databuf);
 	//reg_dhcpv4_cbfunc(dhcpv4_assign, dhcpv4_update, dhcpv4_conflict);
-	httpc_init(_HTTPC_SOCK, ETH_IPv4NetInfo.HTTPC_DomainIP, ETH_IPv4NetInfo.HTTPC_DomainPort, HTTP_ClientComm.TxBuf, HTTP_ClientComm.RxBuf);
+	httpc_init(_HTTPC_SOCK, ETH_IPv4NetInfo.HTTPC_DomainIP, ETH_IPv4NetInfo.HTTPC_DomainPort, HTTP_ClientComm.TxBuf, HTTP_ClientComm.RxBuf, HTTP_ClientComm.HdBuf, HTTP_ClientComm.BdBuf);
 	HAL_TIM_Base_Start_IT(&htim4);
 
 	return;

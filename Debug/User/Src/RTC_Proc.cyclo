@@ -1,0 +1,16 @@
+../User/Src/RTC_Proc.c:41:6:RTC_Initial	1
+../User/Src/RTC_Proc.c:47:9:GetDaysOfLeapMonth	4
+../User/Src/RTC_Proc.c:93:9:GetWeekDay	4
+../User/Src/RTC_Proc.c:118:6:ApplyToDay	6
+../User/Src/RTC_Proc.c:145:7:RTC_GetGmtDate	1
+../User/Src/RTC_Proc.c:174:6:SetToDay	1
+../User/Src/RTC_Proc.c:185:9:RTC_GetDaysOfLeapMonthF	4
+../User/Src/RTC_Proc.c:202:9:RTC_GetWeekDayF	4
+../User/Src/RTC_Proc.c:227:6:RTC_ApplyToDayF	1
+../User/Src/RTC_Proc.c:243:6:RTC_AdjustSetSequence	6
+../User/Src/RTC_Proc.c:278:6:RTC_SetTimeAndDate	2
+../User/Src/RTC_Proc.c:299:6:RTC_GetTimeAndDate	1
+../User/Src/RTC_Proc.c:312:9:BIN_BCD	1
+../User/Src/RTC_Proc.c:321:9:BCD_BIN	1
+../User/Src/RTC_Proc.c:329:9:INT_ASCII_LO	1
+../User/Src/RTC_Proc.c:334:9:INT_ASCII_HI	1

@@ -180,6 +180,7 @@ FIRMWARE_EXT void FirmwareTreatGetipPacket(void);
 FIRMWARE_EXT void FirmwareTreatSetHttpipPacket(void);
 FIRMWARE_EXT void FirmwareTreatGetHttpipPacket(void);
 FIRMWARE_EXT void FirmwareTreatNetModePacket( void);
+FIRMWARE_EXT void AteTreatGetVersion(void);
 
 FIRMWARE_EXT uint8_t FlashUploadDataPacket(void);
 FIRMWARE_EXT uint8_t FlashUploadEndPacket(void);

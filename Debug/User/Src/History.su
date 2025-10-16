@@ -1,0 +1,5 @@
+../User/Src/History.c:24:6:SaveEventLog2EEprom_sFlash	280	static
+../User/Src/History.c:74:6:RestoreEventLogFromEEpromORsFlash	4104	static
+../User/Src/History.c:125:9:CheckEventCardAndLog	64	static
+../User/Src/History.c:387:6:CopyYYMMDDhhmmss	16	static
+../User/Src/History.c:397:6:CheckInSchedule	24	static

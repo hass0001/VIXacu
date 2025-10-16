@@ -16,6 +16,7 @@
 ******************************************************************************/
 #define    FACAUTOTEST_GLOBALS
 #include   "FacAutoTest.h"
+#include "iwdg.h"
 
 #define OS_Delay	MyMsDelay
 
@@ -322,19 +323,22 @@ void FAC_Test_Eeprom( uint32_t * As3ErrorCnt)
       ate_addr++;            // address and data increment
       eep_oData++;
     }
+
+	HAL_IWDG_Refresh(&hiwdg);
+
   }
 }
 
 void FAC_Test_sFlash(uint32_t * As3ErrorCnt)
 {
   test_sf = 0;
-  ate_addr = FLASH_ATE_TEST_START;
+  ate_addr = FLASH_ATE_TEST_START_ADDR;
   sfl_oData = 0;
   *As3ErrorCnt = 0;
 
-  xERASE_ExFlash4kSector(FLASH_ATE_TEST_START);
+  xERASE_ExFlash4kSector(FLASH_ATE_TEST_START_ADDR);
           
-  while( ate_addr < FLASH_ATE_TEST_END)
+  while( ate_addr < FLASH_ATE_TEST_END_ADDR)
   {
     if(!test_sf)
     {
@@ -353,14 +357,109 @@ void FAC_Test_sFlash(uint32_t * As3ErrorCnt)
       ate_addr++;            // address and data increment
       sfl_oData++;
     }
+
+	HAL_IWDG_Refresh(&hiwdg);
+
   }
 }
-
-uint16_t gu16CardResult;
 
 void ATE_Test_AddAuth(void)
 {
 	uint8_t tString[256];
+//	ClearRfCardIndexOnSerialFlash();
+
+	int8_t nWieg = 0;
+	uint8_t wiegand[4];
+
+	// 41123499, 41D1B599,  0356B509, 12345678
+	HttpcSubModeStep = 0;
+	sprintf( tString, "C:20250826105130643:DATA UPDATE user CardNo=129E044E		Pin=KTpnm04	Password=	Group=	StartTime=	EndTime=	Name=박종민	Privilege=0	m_card_no=");
+	Httpc_TreatDataUpdate (tString, strlen( tString) );
+
+	HttpcSubModeStep = 1;
+	sprintf( tString, "C:20250822145805123:DATA UPDATE userauthorize Pin=10116425   AuthorizeTimezoneId=1   AuthorizeDoorId=   CardNo=127C0049");
+	Httpc_TreatDataUpdate (tString, strlen( tString) );
+
+	HttpcSubModeStep = 2;
+	sprintf( tString, "C:20250822145805123:DATA UPDATE userauthorize Pin=10116425   AuthorizeTimezoneId=1   AuthorizeDoorId=   CardNo=127C0049");
+	Httpc_TreatDataUpdate (tString, strlen( tString) );
+
+	HttpcSubModeStep = 3;
+	sprintf( tString, "C:20250522145805123:DATA UPDATE userauthorize Pin=10116425   AuthorizeTimezoneId=1   AuthorizeDoorId=   CardNo=127C0049");
+	Httpc_TreatDataUpdate (tString, strlen( tString) );
+
+	wiegand[0] = 0x00; wiegand[1] = 0x49; wiegand[2] = 0x12; wiegand[3] = 0x7C;
+	ATE_Test_ID(wiegand);
+
+//	sprintf( tString, "C:20250522145819194:DATA DELETE userauthorize Pin=KS100   CardNo=127c89bf");
+//	Httpc_TreatDataDelete (tString, strlen( tString) );
+//	ATE_Test_ID(wiegand);
+
+}
+
+
+void ATE_Test_ID(uint8_t * CardData)
+{//카드데이터 검색!!
+	uint16_t gu16CardResult;
+	uint8_t n485Door = ConsoleParameter.DoorNumber[4];
+	gu16CardResult = CheckRfCardDataInFlash(CardData, 1);
+	uint8_t u8Result = CheckEventCardAndLog( n485Door, CardData, gu16CardResult);
+	if(u8Result == 0)
+	{   //  #define  Result_OK  0
+		ConsoleResultPack(1); //  {  IDX_AUDIOMENT_DOOR_OPEN, IDX_AUDIOMENT_MUTE_100MS}, // 0x01
+#ifdef DEBUG_MODE
+printf( "ATE_Test_ID ConsoleResultPack 1 result=%02X\r\n", u8Result);
+#endif
+
+//				memcpy(&SdpParameter.CardData[0], &CopyRx2Rs485Buf[CS_INDEX_DATA+6], 8);
+		//		RESTClient_SetPacketReady( UHS_Type_AccessInfo102);
+	}
+	else
+	{
+#ifdef DEBUG_MODE
+printf( "ATE_Test_ID ConsoleResultPack 2 result=%02X\r\n", u8Result);
+#endif
+		ConsoleResultPack(2); // {  IDX_AUDIOMENT_NO_REGISTERD_CARD, IDX_AUDIOMENT_CHECK_USE_AGAIN}, // 0x02
+	}
+	ConsoleAccessMethod();
+}
+
+void ATE_Test_DoorSync(void)
+{
+	uint8_t tString[256];
+	uint8_t nWieg = 0;
+	uint8_t wiegand[4];
+//	"SET OPTIONS DateTime=819885572,ServerTZ=+0900"
+//	"DATA UPDATE user CardNo=92C46A35	Pin=2222	Password=	Group=	StartTime=	EndTime=	Name=2층원	Privilege=0	m_card_no="
+//	"DATA UPDATE userauthorize Pin=2222	AuthorizeTimezoneId=1	AuthorizeDoorId=	CardNo=92C46A35"
+
+	sprintf( tString, "C:20250326105130643:SET OPTIONS DateTime=819885572,ServerTZ=+0900");
+	Httpc_TreatDataUpdate (tString, strlen( tString) );
+
+	sprintf( tString, "C:20250326105130643:DATA UPDATE user CardNo=92C487BC	Pin=1234	Password=	Group=	StartTime=	EndTime=	Name=2층원	Privilege=0	m_card_no=");
+	Httpc_TreatDataUpdate (tString, strlen( tString) );
+
+	sprintf( tString, "C:20250522145805123:DATA UPDATE userauthorize Pin=1234	AuthorizeTimezoneId=1	AuthorizeDoorId=	CardNo=92C487BC");
+	Httpc_TreatDataUpdate (tString, strlen( tString) );
+
+	sprintf( tString, "C:20250326105130643:SET OPTIONS DateTime=819885572,ServerTZ=+0900");
+	Httpc_TreatDataUpdate (tString, strlen( tString) );
+
+	sprintf( tString, "C:20250326105130643:DATA UPDATE user CardNo=92C46A35	Pin=2222	Password=	Group=	StartTime=	EndTime=	Name=2층원	Privilege=0	m_card_no=");
+	Httpc_TreatDataUpdate (tString, strlen( tString) );
+
+	sprintf( tString, "C:20250522145805123:DATA UPDATE userauthorize Pin=2222	AuthorizeTimezoneId=1	AuthorizeDoorId=	CardNo=92C46A35");
+	Httpc_TreatDataUpdate (tString, strlen( tString) );
+
+	sprintf( tString, "C:20250326105130643:SET OPTIONS DateTime=819885572,ServerTZ=+0900");
+	Httpc_TreatDataUpdate (tString, strlen( tString) );
+
+	sprintf( tString, "C:20250326105130643:DATA UPDATE user CardNo=A2C46B35	Pin=4567	Password=	Group=	StartTime=	EndTime=	Name=2층원	Privilege=0	m_card_no=");
+	Httpc_TreatDataUpdate (tString, strlen( tString) );
+
+	sprintf( tString, "C:20250522145805123:DATA UPDATE userauthorize Pin=4567	AuthorizeTimezoneId=1	AuthorizeDoorId=	CardNo=A2C46B35");
+	Httpc_TreatDataUpdate (tString, strlen( tString) );
+
 	// 41123499, 41D1B599,  0356B509, 12345678
 	sprintf( tString, "C:20250326105130643:DATA UPDATE user CardNo=12345678 Pin=KS100  Password=");
 	Httpc_TreatDataUpdate (tString, strlen( tString) );
@@ -368,34 +467,48 @@ void ATE_Test_AddAuth(void)
 	sprintf( tString, "C:20250522145805123:DATA UPDATE userauthorize Pin=KS100   AuthorizeTimezoneId=1   AuthorizeDoorId=   CardNo=12345678");
 	Httpc_TreatDataUpdate (tString, strlen( tString) );
 
-	uint8_t nWieg = 0;
-	uint8_t wiegand[4];
+	wiegand[0] = 0x92; wiegand[1] = 0xC4; wiegand[2] = 0x87; wiegand[3] = 0xBC;
+	ATE_Test_ID(wiegand);
+
+	wiegand[0] = 0x92; wiegand[1] = 0xC4; wiegand[2] = 0x6A; wiegand[3] = 0x35;
+	ATE_Test_ID(wiegand);
+
+	wiegand[0] = 0x92; wiegand[1] = 0xC4; wiegand[2] = 0x6B; wiegand[3] = 0x35;
+	ATE_Test_ID(wiegand);
+
 	wiegand[0] = 0x12; wiegand[1] = 0x34; wiegand[2] = 0x56; wiegand[3] = 0x78;
-    gu16CardResult = CheckRfCardDataInFlash( wiegand); //카드데이터 검색!!
-    CheckEventCardAndLog( nWieg, wiegand, gu16CardResult);
+	ATE_Test_ID(wiegand);
 
 
 	sprintf( tString, "C:20250522145819194:DATA DELETE userauthorize Pin=KS100   CardNo=12345678");
 	Httpc_TreatDataDelete (tString, strlen( tString) );
-
-    gu16CardResult = CheckRfCardDataInFlash( wiegand); //카드데이터 검색!!
-    CheckEventCardAndLog( nWieg, wiegand, gu16CardResult);
-
+	ATE_Test_ID(wiegand);
 }
-
 
 void ATE_Test_VixpassSchedule(void)
 {
 	uint8_t tString[256];
 	// 41123499, 41D1B599,  0356B509, 12345678
-	sprintf( tString, "C:20250522145805123:DATA UPDATE timezone TimezoneId=2	SunTime1= 0	MonTime1=52430759	TueTime1=52430759	WedTime1=52430759	ThuTime1=52430759	FriTime1=52430759	SatTime1=0	Hol1Time1=0");
+//	sprintf( tString, "C:20250807180611314:DATA UPDATE timezone TimezoneId=2	SunTime1=0	MonTime1=0	TueTime1=0	WedTime1=0	ThuTime1=0	FriTime1=111412903	SatTime1=0	Hol1Time1=0");
+	sprintf( tString, "C:20250807180611314:DATA UPDATE timezone TimezoneId=2	SunTime1=2003	MonTime1=2200	TueTime1=102	WedTime1=200	ThuTime1=59638675	FriTime1=300	SatTime1=2200	Hol1Time1=2300");
+//	sprintf( tString, "C:20250807180611314:DATA UPDATE timezone TimezoneId=2      SunTime1=3      MonTime1=0      TueTime1=13107200       WedTime1=52430759      ThuTime1=0      FriTime1=0      SatTime1=26214700       Hol1Time1=0");
+//	sprintf( tString, "C:20250522145805123:DATA UPDATE timezone TimezoneId=2	SunTime1= 0	MonTime1=52430759	TueTime1=52430759	WedTime1=52430759	ThuTime1=52430759	FriTime1=52430759	SatTime1=0	Hol1Time1=0");
 	Httpc_TreatDataUpdate (tString, strlen( tString) );
 
     LoadScheduleData();
-
 	ChangeLockMode( LockMode_Schedule_Unlock, 0);
 
     DoorTimerProcess(); //도어의 lock mode를 체크해서 time code 확인으로 door 상태 변경 진행..
+}
 
+void ATE_Test_SetTime(void)
+{
+	uint8_t tString[256];
+	// 41123499, 41D1B599,  0356B509, 12345678
+	// SET OPTIONS DateTime=822813915,ServerTZ=+0900
+	sprintf( tString, "C:20250807180611314:SET OPTIONS DateTime=822813915,ServerTZ=+0900");
+	Httpc_TreatSetOption (tString, strlen( tString) );
+
+    DoorTimerProcess(); //도어의 lock mode를 체크해서 time code 확인으로 door 상태 변경 진행..
  }
 

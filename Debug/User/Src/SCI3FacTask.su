@@ -1,0 +1,11 @@
+../User/Src/SCI3FacTask.c:36:6:initTaskRunStatus	8	static
+../User/Src/SCI3FacTask.c:42:6:TaskRunCnt	16	static
+../User/Src/SCI3FacTask.c:68:6:facLEDControl	8	static
+../User/Src/SCI3FacTask.c:80:6:Rs232_Nesslab_SendCommand	16	static
+../User/Src/SCI3FacTask.c:89:6:Rs232StartInventory	32	static
+../User/Src/SCI3FacTask.c:104:6:Rs232Set900Channel	24	static
+../User/Src/SCI3FacTask.c:134:6:Rs232Set900BuzzerOnOff	24	static
+../User/Src/SCI3FacTask.c:157:6:Rs232TreatCardPacket	24	static
+../User/Src/SCI3FacTask.c:191:6:Rs232TreatReaderOk	4	static
+../User/Src/SCI3FacTask.c:198:6:Rs232Set900ReaderFail	8	static
+../User/Src/SCI3FacTask.c:209:6:CHAFON_Crc16Cal	24	static

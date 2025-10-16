@@ -89,7 +89,8 @@ FACAUTOTEST_EXT void AteTreatTerminalType(void);
 FACAUTOTEST_EXT void AteTreatFacType(void);
 FACAUTOTEST_EXT void AteTreatErrorType(uint8_t errorKind);
 FACAUTOTEST_EXT void AteTreatPanelType(void);
-
+FACAUTOTEST_EXT void ATE_Test_ID(uint8_t * CardData);
+FACAUTOTEST_EXT void ATE_Test_SetTime(void);
 FACAUTOTEST_EXT void RequestOsSendTx3Data(void);
 FACAUTOTEST_EXT void AteSendParamReady(void);
 

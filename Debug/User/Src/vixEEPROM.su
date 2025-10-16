@@ -1,0 +1,10 @@
+../User/Src/vixEEPROM.c:31:6:SEARCH_I2cSlavesAll	16	static
+../User/Src/vixEEPROM.c:47:6:I2CWPEnable	8	static
+../User/Src/vixEEPROM.c:52:6:I2CWPDisable	8	static
+../User/Src/vixEEPROM.c:64:6:RECOVER_I2cError	40	static
+../User/Src/vixEEPROM.c:142:10:xWRITE_DataToEeprom	48	static
+../User/Src/vixEEPROM.c:205:10:xERASE_EepromPage	88	static
+../User/Src/vixEEPROM.c:253:10:xREAD_DataFromEeprom	40	static
+../User/Src/vixEEPROM.c:294:6:TEST_Eeprom	80	dynamic
+../User/Src/vixEEPROM.c:421:6:CREATE_EepromSync	4	static
+../User/Src/vixEEPROM.c:430:6:CREATE_EepromTest	4	static

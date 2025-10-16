@@ -39,7 +39,7 @@
 /******************************************************************************
 **    Local Values
 ******************************************************************************/
-//static uint8_t err;
+FLASH_EXT uint16_t countRegidt[7];
 
 /******************************************************************************
 **    Global Values
@@ -49,7 +49,7 @@ FLASH_EXT uint8_t FlashErasing;
 
 #define	FLASH_ROM_BASE			0x00000000L
 
-  // 1섹터내의 모바일 카드 영역
+ /* // 1섹터내의 모바일 카드 영역
 #define SIZE_OF_MPCARD_DATA 		 16 	// 16바이트의 카드정보 데이터.. cardData[7~2](6), Pin[7~0](8), Using Pass[1~0](2)
 #define SIZE_OF_MPCARD_MSLOT	 	512 	//할당된 모바일 카드 슬롯의 바이트 수
 #define NUM_OF_MPCARD_DATA_PER_MSLOT  31 	 // 한 슬롯당 할당된 모바일 카드 개수 512/16 - 1
@@ -60,21 +60,23 @@ FLASH_EXT uint8_t FlashErasing;
 #define SIZE_OF_DIR_MPCARD_SLOT		4096	 // 1 Sector 4096 바이트의 확장공간 카드정보 데이터..
 #define NUM_OF_DIR_MPCARD_PER_SECTOR	227 	 // 1섹터 확장공간에 저장되는 카드는 227개
 #define NUM_OF_DIR_MPCARD_SECTOR		2048 	 // 모바일 카드 확장공간 섹터 슬롯 수는 2048개
-#define IDX_OF_DIR_MPCARD_COUNT		4086 	 // 모바일 카드 확장공간 섹터 당 저장 모바일 카드 데이터 수가 있는 인덱스
+#define IDX_OF_DIR_MPCARD_COUNT		4086 	 // 모바일 카드 확장공간 섹터 당 저장 모바일 카드 데이터 수가 있는 인덱스*/
 
 // 1섹터내의 RF 카드 영역
 #define SIZE_OF_RFCARD_DATA 		 16 	// 16바이트의 카드정보 데이터.. cardData[3~2](2), Pin[7~0](8), Using Pass[1~0](2), Last(4)
 #define SIZE_OF_RFCARD_RSLOT	    256	 	//할당된 RF 카드 슬롯의 바이트 수
-#define NUM_OF_RFCARD_DATA_PER_RSLOT  15 	 // 한 슬롯당 할당된 RF 카드 개수 256/16 - 1
+#define NUM_OF_RFCARD_DATA_PER_RSLOT  15 	 // 한 슬롯당 할당된 RF 카드 개수 256/16 - 1  0~14
+
 #define NUM_OF_RSLOT_PER_SECTOR		  16	 // 1 섹터마다 저장되는 RF 카드는 8*32
 
 // 1섹터내의 RF 카드 확장영역
-#define SIZE_OF_DIR_RFCARD_DATA		 18 	// 18바이트의 카드정보 데이터.. cardData[7~0](8), Pin[7~0](8), Using Pass[1~0](2), Last(4)
+#define SIZE_OF_DIR_RFCARD_DATA		 18 	// 18바이트의 카드정보 데이터.. cardData[3~0](4), Pin[7~0](8), Using Pass[1~0](2), Last(4)
 #define SIZE_OF_DIR_RFCARD_SLOT		4096	 // 1 Sector 4096 바이트의 확장공간 카드정보 데이터..
-#define NUM_OF_DIR_RFCARD_PER_SECTOR	227 	 // 1섹터 확장공간에 저장되는 카드는 227개
-#define NUM_OF_DIR_RFCARD_SECTOR		1024 	 // RF카드 확장공간 섹터 수는 1024개
-#define IDX_OF_DIR_RFCARD_COUNT		4086 	 // RF카드 확장공간 섹터 당 저장 RF 카드 데이터 수가 있는 인덱스
+#define NUM_OF_DIR_RFCARD_PER_SECTOR	227 	 // 1섹터 확장공간에 저장되는 카드는 227개  0~226
 
+#define NUM_OF_DIR_RFCARD_SECTOR		1024 	 // RF카드 확장공간 섹터 수는 1024개
+#define IDX_OF_DIR_RFCARD_COUNT	(SIZE_OF_DIR_RFCARD_DATA*NUM_OF_DIR_RFCARD_PER_SECTOR)   //	4086
+											// RF카드 확장공간 섹터 당 저장 RF 카드 데이터 수가 있는 인덱스
 
 // pin 권한 Flash ㅇㅁㅅㅁ
 #define NUM_BYTE_PIN_COUNT	2
@@ -93,25 +95,25 @@ FLASH_EXT uint8_t FlashErasing;
 #define FLASH_EventHisory_End	 0x00092000L
 
 // CARD 데이터 영역
-#define FLASH_MpCardData_Start	FLASH_EventHisory_End	//	0x00092000L
-#define FLASH_MpCardData_End	0x02092000L
+//#define FLASH_MpCardData_Start	FLASH_EventHisory_End	//	0x00092000L
+//#define FLASH_MpCardData_End	0x02092000L
 
-#define FLASH_RfCardData_Start	FLASH_EventHisory_End	//	0x00092000L
+#define FLASH_RfCardData_Start	0x00092000L
 #define FLASH_RfCardData_End	0x01092000L
 //#define FLASH_RfCardData_Start	FLASH_MpCardData_End	//	0x02092000L
 //#define FLASH_RfCardData_End	0x03092000L
 
-#define FLASH_MpCardData_Direct_Start	FLASH_RfCardData_End	//	0x03092000L
-#define FLASH_MpCardData_Direct_End		0x03892000L
+//#define FLASH_MpCardData_Direct_Start	FLASH_RfCardData_End	//	0x03092000L
+//#define FLASH_MpCardData_Direct_End		0x03892000L
 
-#define FLASH_RfCardData_Direct_Start	FLASH_RfCardData_End	// 0x01092000L
-#define FLASH_RfCardData_Direct_End		0x01493000L
+#define FLASH_RfCardData_Direct_Start	0x01092000L
+#define FLASH_RfCardData_Direct_End		0x01492000L
 //#define FLASH_RfCardData_Direct_Start	FLASH_MpCardData_Direct_End	// 0x03892000L
 //#define FLASH_RfCardData_Direct_End		0x03C92000L
 
-#define FLASH_AUTHORITY_DATA  	0x03092000L
-#define FLASH_ATE_TEST_START	0x03C93000L
-#define FLASH_ATE_TEST_END		0x03FFF000L	// 테스트 끝인데 위에꺼 보다 길게..
+//#define FLASH_AUTHORITY_DATA  	0x03092000L
+#define FLASH_ATE_TEST_START_ADDR	0x03C93000L
+#define FLASH_ATE_TEST_END_ADDR		0x03FFF000L	// 테스트 끝인데 위에꺼 보다 길게..
 
 //External Flash Control
 #define  ADDR_FLASH_UPGRADE_STATUS_INFO    FLASH_FIRMWARE_INFO
@@ -208,7 +210,8 @@ typedef union {
   uint8_t u8strParam[16];
 }unionCard_Parameter;
 
-FLASH_EXT unionCard_Parameter CardParameter;        // 39
+FLASH_EXT unionCard_Parameter NewCardParam;        // 39
+     // 39
 
 /******************************************************************************
 **
@@ -218,7 +221,7 @@ FLASH_EXT unionCard_Parameter CardParameter;        // 39
 
 FLASH_EXT void SPI2_sFlash_Init(void);
 
-FLASH_EXT uint16_t CheckRfCardDataInFlash( uint8_t *cardData);
+FLASH_EXT uint16_t CheckRfCardDataInFlash( uint8_t *cardData, uint8_t bRW);
 FLASH_EXT uint16_t CheckMpCardDataInFlash( uint8_t *cardData);
 FLASH_EXT uint8_t WriteRfCardDataToSerialFlash( uint8_t *cardData);
 FLASH_EXT uint8_t WriteRfCardDataBlockToSerialFlash(uint8_t *cardData); //address형 card data 블럭으로 쓰기..
@@ -232,6 +235,10 @@ FLASH_EXT  uint8_t ClearRfCardIndexOnSerialFlash( void);
 //FLASH_EXT uint8_t ClearEventDataOfSerialFlashAll(void);
 FLASH_EXT uint8_t ClearCardNumOfSerialFlash(uint32_t sFlash4kAddr);
 FLASH_EXT uint8_t ResetCardDataOfSerialFlash(void);
+
+FLASH_EXT uint8_t CheckDefaultCard(  uint8_t *dCardData);
+FLASH_EXT uint32_t  GetRfCardCountInFlash(void);
+FLASH_EXT uint8_t  GetRfCardDataInFlash(uint8_t * cardAddr, uint8_t * dataBuf);
 
 FLASH_EXT uint8_t EraseSFlash(uint32_t u32StartAddress, uint32_t u32EndAddress);
 FLASH_EXT void WriteSFlash4kSectorData( uint32_t sectorAddress, uint8_t * buf4kData);

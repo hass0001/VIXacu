@@ -44,7 +44,7 @@ void Wiegand_reset_port(uint8_t nPort, uint8_t b34Type) {
     gUcWiegandType[nPort] = 33;
 
 #ifdef HIDWIEGAND37FORMAT
-gUcWiegandType[nPort] = 36;//임시로 26받기위해..
+  gUcWiegandType[nPort] = 36;//임시로 26받기위해..
 #endif
 
   memset(WiegandCard[nPort], 0, MAX_BYTE_CARD); //4
@@ -58,6 +58,7 @@ void Wiegand_init_value(void)
        Wiegand_reset_port(nWieg, WiegandParameter.CommType[nWieg]&0x7f);//&0x7f ? 최상위비트는 순/역방향..
      }
 }
+
      
 void Check_Wiegand_Input(void)
 {
@@ -72,6 +73,7 @@ void Check_Wiegand_Input(void)
   {
     if( gUcSetValue[nWieg] == 1)
     {
+        _RS485_LED_ON();
 //      if(gU32WiegandValue[nWieg] == 0xffffffff){//0xffffffff 가 들어오면 다음 채널로 넘긴다..
       if((gUcWiegandType[nWieg] == 33  && gU64WiegandValue1[nWieg] == 0xffffffff) || //0xffffffff 가 들어오면 다음 채널로 넘긴다..
          (gUcWiegandType[nWieg] == 65  && gU64WiegandValue1[nWieg] == 0xffffffffffffffff) || 
@@ -131,34 +133,54 @@ void Check_Wiegand_Input(void)
         Wiegand_reset_port(nWieg, WiegandParameter.CommType[nWieg]&0x7f);//최상위비트는 순/역방향..
         continue; // 0은 처리하지 않음..
       }
-  
+
+
 #ifdef FLASH_SAVE_TEST
-        WiegandCard[nWieg][0] = 0x88;
-        WiegandCard[nWieg][1] = 0x59;
-        WiegandCard[nWieg][2] = 0x03;
-        WiegandCard[nWieg][3] = 0x00;
+      u8AsciiString[0] = 0x12;
+      u8AsciiString[1] = 0x7C;
+      u8AsciiString[2] = 0x00;
+      u8AsciiString[3] = 0x49;
 #else
       if(WiegandParameter.CommType[nWieg]&0x80)
       {  //&0x80 최상위비트는 순/역방향..
         for(int i = 0; i < 4; i++)
-          WiegandCard[nWieg][i] = union32WiegandValue.u8String[i];
+        	u8AsciiString[i] = union32WiegandValue.u8String[i];
       }
       else
       {  //순방향..
         for(int i = 0; i < 4; i++) //little endian 은 숫자는 거꾸로 되어 있음..
-          WiegandCard[nWieg][i] = union32WiegandValue.u8String[3 - i]; // 3,2,1,0
+        	u8AsciiString[i] = union32WiegandValue.u8String[3 - i]; // 3,2,1,0
       }
 #endif
 
-      _RS485_LED_TOGGLE();
-      u16CardResult = CheckRfCardDataInFlash( WiegandCard[nWieg]); //카드데이터 검색!!
+#ifdef CARD_2301_ORDER
+      WiegandCard[nWieg][0] = u8AsciiString[2];
+      WiegandCard[nWieg][1] = u8AsciiString[3];
+      WiegandCard[nWieg][2] = u8AsciiString[0];
+      WiegandCard[nWieg][3] = u8AsciiString[1];
+#else  // CARD 0123 순서
+      WiegandCard[nWieg][0] = u8AsciiString[0];
+      WiegandCard[nWieg][1] = u8AsciiString[1];
+      WiegandCard[nWieg][2] = u8AsciiString[2];
+      WiegandCard[nWieg][3] = u8AsciiString[3];
+#endif
+
+      u16CardResult = CheckRfCardDataInFlash( WiegandCard[nWieg], 1); //카드데이터 검색!!
       CheckEventCardAndLog( nWieg, WiegandCard[nWieg], u16CardResult);
-      
-      printf( "Wiegand %d value=%x, WiegandCard=%02x%02x%02x%02x%02x%02x%02x%02x\r\n",nWieg, gU64WiegandValue1[nWieg],
+
+ /*     printf( "Wiegand %d value=%x, WiegandCard=%02x%02x%02x%02x%02x%02x%02x%02x\r\n",nWieg, gU64WiegandValue1[nWieg],
       WiegandCard[nWieg][0], WiegandCard[nWieg][1], WiegandCard[nWieg][2], WiegandCard[nWieg][3],
-      WiegandCard[nWieg][4], WiegandCard[nWieg][5], WiegandCard[nWieg][6], WiegandCard[nWieg][7] );
+      WiegandCard[nWieg][4], WiegandCard[nWieg][5], WiegandCard[nWieg][6], WiegandCard[nWieg][7] );*/
       Wiegand_reset_port(nWieg, WiegandParameter.CommType[nWieg]&0x7f);//최상위비트는 순/역방향..
-      _RS485_LED_TOGGLE();
+      _RS485_LED_OFF();
+
+#ifdef DEBUG_MODE
+		uint8_t tltBuffer[7];
+		RTC_GetTimeAndDate( &toDayTime, tltBuffer);
+		printf( "억세스 시간 time=20%02d-%02d-%02d %02d:%02d:%02d\r\n",
+			tltBuffer[0], tltBuffer[1], tltBuffer[2], tltBuffer[3], tltBuffer[4], tltBuffer[5]);
+#endif
+
     }
     else
     {
@@ -185,6 +207,10 @@ void Check_Wiegand_Input(void)
         {
             gUcPrevBitCnt[nWieg]++;  // 50번 이상 읽을 때까지 매번 증가 시킴.
         }
+#ifdef SENMINI_WIEGAND_DELAY   // 센미니 위앤드는 느려서 일ㄱ는데 딜레이가 필요
+        printf( "Wiegand %d bit count %x Duration %x!\r\n",nWieg, gUcWiegBitCnt[nWieg], gUcPrevBitCnt[nWieg] );
+#endif
+
       }
     }
   }
@@ -322,50 +348,50 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     }
     else if(GPIO_Pin == GPIO_PIN_2){ //W1D0
         if(!HAL_GPIO_ReadPin(GPIOD, GPIO_PIN_2)){
-//           	printf("\r\n LOW");
+//        	printf("\r\nW1D0 LOW");
            	WiegandSetInputData(0, BIT_RESET);   // D0
         }
     }
     else if(GPIO_Pin == GPIO_PIN_3){ //W3D1 -> W4D1
          if(!HAL_GPIO_ReadPin(GPIOD, GPIO_PIN_3)){
            	WiegandSetInputData(3, BIT_SET);   // D1
-//           	printf("\r\n LOW");
+//           	printf("\r\nW4D1 LOW");
         }
     }
     else if(GPIO_Pin == GPIO_PIN_6){ //W2D0
         if(!HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_6)){
            	WiegandSetInputData(1, BIT_RESET);   // D0
-//           	printf("\r\n LOW");
+ //          	printf("\r\nW2D0 LOW");
         }
     }
     else if(GPIO_Pin == GPIO_PIN_7){ //W1D1
         if(!HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_7)){
            	WiegandSetInputData( 0, BIT_SET);   // D1
-////           	printf("\r\n LOW");
+//           	printf("\r\nW1D1 LOW");
         }
     }
     else if(GPIO_Pin == GPIO_PIN_8){ //W4D0 -> W3D0
         if(!HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_8)){
            	WiegandSetInputData( 2, BIT_RESET);   // D0
- //          	printf("\r\n LOW");
+ //          	printf("\r\nW3D0 LOW");
         }
     }
     else if(GPIO_Pin == GPIO_PIN_11){ //W3D0 -> W4D0
         if(!HAL_GPIO_ReadPin(GPIOG, GPIO_PIN_11)){
            	WiegandSetInputData( 3, BIT_RESET);   // D0
-//           	printf("\r\n LOW");
+ //          	printf("\r\nW4D0 LOW");
          }
     }
     else if(GPIO_Pin == GPIO_PIN_12){ //W4D1 -> W3D1
         if(!HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_12)){
            	WiegandSetInputData( 2, BIT_SET);   // D1
- //         	printf("\r\n 3333 1111");
+ //         	printf("\r\nW3D1 low");
          }
     }
     else if(GPIO_Pin == GPIO_PIN_15){ //W2D1
          if(!HAL_GPIO_ReadPin(GPIOG, GPIO_PIN_15)){
            	WiegandSetInputData( 1, BIT_SET);   // D1
- //          	printf("\r\n LOW");
+  //         	printf("\r\nW2D1 LOW");
          }
     }
 //    OS_LeaveNestableInterrupt();      // should Interrupt Enable

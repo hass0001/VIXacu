@@ -1,0 +1,4 @@
+../User/Src/vixSpiDriver.c:24:9:READ_aByteFromW6100	11
+../User/Src/vixSpiDriver.c:56:6:WRITE_aByteToW6100	11
+../User/Src/vixSpiDriver.c:88:6:READ_BurstFromW6100	11
+../User/Src/vixSpiDriver.c:123:6:WRITE_BurstToW6100	11

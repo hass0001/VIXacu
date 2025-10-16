@@ -18,17 +18,46 @@
 const INT8U DefaultSystemFlag[8] = {'B','r','u','c','e','I','v','x'}; //INT8U SystemFlag[8];
 const INT8U DefaultSerial[8] = {'J','A','2','5','0','1','3','5'}; //INT8U SiteInfo[8];
 
+#ifdef GUUI_PULLMAN_485
 const INT8U DefaultCmsParameter[LEN_E2ROM_CMS] = {
-  192,168, 0, 123,
-  255,255,255,  0,
-  192,168,  0,  1,//INT8U GatewayAddress[4]; 16
+  10,20,54,152,
+  255,255, 0, 0,
+  10,20, 0, 1,//INT8U GatewayAddress[4]; 16
   168,126, 63,  1, //KT dns
-  0x70,0xDA,0x9C, 0x02,0x07,0x08, //INT8U MacAddress[6];
+  0xBC,0x47,0x6E, 0x80,0x02,0x42, //INT8U MacAddress[6];
   5,5,5, 5,5,5,//DoorOpenTime [MAX_NUM_RELAY];  12
-  0,0,0, 0,0,0, 0,0,0, 0,0,0, 0,0,0, 0,0,0, //DoorTimeCode[MAX_NUM_RELAY][3];
+  2,2,2, 2,2,2, 2,2,2, 2,2,2, 2,2,2, 2,2,2, //DoorTimeCode[MAX_NUM_RELAY][3];
   0,0,0, 0,0,0, 0,0,0, 0,0,0, 0,0,0, 0,0,0, //LimitCardTimeCode[MAX_NUM_RELAY][3];
   0,0,0, 0,0,0, 0,0,0, 0,0,0, 0,0,0, 0,0,0  //SpecialCardTimeCode[MAX_NUM_RELAY][3]; 54
 };
+
+const INT8U DefaultHttpcParameter[LEN_E2ROM_HTTPC] =
+{//httpc Parameter
+  10,20,11,232,   // TAIP1[4] 172.16.3.43
+  0x1F,0x99,     // TAPort[2] 0x1F,0x99, // 8089  // 0x53,0x4E,  // 21326
+  4,0,0,0,0,0,0,0       //ScheduleCode[8]  heart second,
+};
+#endif  // KT West
+#ifdef KTWEST_WIEGAND
+const INT8U DefaultCmsParameter[LEN_E2ROM_CMS] = {
+  10,1,105,69,
+  255,255, 255, 0,
+  10,1, 105, 1,//INT8U GatewayAddress[4]; 16
+  168,126, 63,  1, //KT dns
+  0xBC,0x47,0x6E, 0x80,0x02,0x42, //INT8U MacAddress[6];
+  5,5,5, 5,5,5,//DoorOpenTime [MAX_NUM_RELAY];  12
+  2,2,2, 2,2,2, 2,2,2, 2,2,2, 2,2,2, 2,2,2, //DoorTimeCode[MAX_NUM_RELAY][3];
+  0,0,0, 0,0,0, 0,0,0, 0,0,0, 0,0,0, 0,0,0, //LimitCardTimeCode[MAX_NUM_RELAY][3];
+  0,0,0, 0,0,0, 0,0,0, 0,0,0, 0,0,0, 0,0,0  //SpecialCardTimeCode[MAX_NUM_RELAY][3]; 54
+};
+
+const INT8U DefaultHttpcParameter[LEN_E2ROM_HTTPC] =
+{//httpc Parameter
+  10,1,105,2,   // TAIP1[4] 172.16.3.43
+  0x1F,0x99,     // TAPort[2] 0x1F,0x99, // 8089  // 0x53,0x4E,  // 21326
+  4,0,0,0,0,0,0,0       //ScheduleCode[8]  heart second,
+};
+#endif
 
 const INT8U DefaultSensorParameter[LEN_E2ROM_SENSOR] =
 {//Sensor Parameter 0~8
@@ -57,7 +86,7 @@ const INT8U DefaultLockParameter[LEN_E2ROM_LOCK] =
 const INT8U DefaultConsoleParameter[LEN_E2ROM_CONSOLE] =
 {//Console Parameter 0~8
   5,5,5,5,5,5,5,5,//AccessOpenTime 의미엇음..
-  1,1,1,1,0,0,0,0,//Type        등록된 리더기.. 기본은 1번만..
+  1,1,1,1,1,1,1,1,//Type        등록된 리더기.. 기본은 1번만..
   0,1,2,3,0,1,2,3, //DoorNumber 릴레이를 작동시킬 대상.. 이건 711에서 사용하는 것임.. 의미 부활 시킴..
   1,2,3,4,5,6,7,8//AttendControl        //성능인증에서 임시 사둉.. 향후 재검토 후 적용..
 };
@@ -68,13 +97,6 @@ const INT8U DefaultWiegandParameter[LEN_E2ROM_WIEGAND] =
   0,0,0,0,	//AntiPassback
   1,1,1,1,	//OkRelayGroupNum
   1,1,1,1	//ErrRelayGroupNum
-};
-
-const INT8U DefaultHttpcParameter[LEN_E2ROM_HTTPC] =
-{//httpc Parameter
-  192,168,0,100,   // TAIP1[4] 172.16.3.43
-  0x1F,0x99,     // TAPort[2] 0x1F,0x99, // 8089  // 0x53,0x4E,  // 21326
-  4,0,0,0,0,0,0,0       //ScheduleCode[8]  heart second,
 };
 
 const INT8U DefaultFireParameter[LEN_E2ROM_FIRE] =

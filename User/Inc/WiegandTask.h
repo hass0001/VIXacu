@@ -31,7 +31,7 @@
 #define  MAX_BYTE_CARD   4      //16 까지.. 이 값을 바꾸려면 카드값 조회 로직이 바뀐다는 전제하에 진행되어야 함..
 
 #define  MIN_TIME_BIT_DURATION   150        // 150 us   이게 사실상 의미가 거의 없음..
-#define  MAX_TIME_BYTE_DURATION    550    //기존은 10번.. 휴젠단말기처럼 느리게 보내는 경우 W130 받을 땐 계속 리셋됨
+#define  MAX_TIME_BYTE_DURATION  300    //기존은 10번.. 휴젠단말기처럼 느리게 보내는 경우 W130 받을 땐 계속 리셋됨
 
 
 #define BIT_RESET   0

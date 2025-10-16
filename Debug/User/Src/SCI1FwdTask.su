@@ -1,0 +1,2 @@
+../User/Src/SCI1FwdTask.c:22:6:SCI1FwdTaskInit	16	static
+../User/Src/SCI1FwdTask.c:73:6:SendCP_Status	32	static

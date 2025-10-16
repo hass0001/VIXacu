@@ -236,6 +236,9 @@ uint8_t SerialCommandProcess(void)            // Firmware Update or moniter  Pro
         case FWD_TYP_CLEAR_CARD:          // 0x47
           AteTreatSclearType();
           break;
+        case FWD_TYP_GET_VERSION:          // 0x48
+          AteTreatGetVersion();
+          break;
         case ATE_TYP_SFLASH_READ:          // 0x5C
           AteTreatSreadType();
           break;
@@ -690,6 +693,29 @@ void AteTreatSclearType(void)
 	FwdCommTx1Buf[FWD_STATE_DAT+2] = ATE_CHAR_ETX;
 
 	FwdTx1Ctr = FWD_STATE_DAT+3;
+	FwdTx1Ptr = &FwdCommTx1Buf[0];
+
+	FirmwareRequestSendData();
+}
+
+void AteTreatGetVersion(void)
+{
+    int32_t StartAddr = 0, writeAddr = 0, ni = 0;
+    int8_t nChecksum = 0, wData = 0;
+    int8_t versionStr[120];
+
+    VS_GetVersionStr((char*)versionStr);
+
+	FwdCommTx1Buf[FWD_STATE_PRM] = FW_UPD_PROTOCOL_PRM;
+	FwdCommTx1Buf[FWD_STATE_STX] = ATE_CHAR_STX;
+	FwdCommTx1Buf[FWD_STATE_LEN] = 8;                      nChecksum += FwdCommTx1Buf[FWD_STATE_LEN];
+	FwdCommTx1Buf[FWD_STATE_CMD] = FWD_TYP_GET_VERSION;   nChecksum += FwdCommTx1Buf[FWD_STATE_CMD];//
+
+	memcpy(&FwdCommTx1Buf[FWD_STATE_DAT], versionStr, 8);
+	FwdCommTx1Buf[FWD_STATE_DAT+8] = nChecksum;
+	FwdCommTx1Buf[FWD_STATE_DAT+9] = ATE_CHAR_ETX;
+
+	FwdTx1Ctr = FWD_STATE_DAT+10;
 	FwdTx1Ptr = &FwdCommTx1Buf[0];
 
 	FirmwareRequestSendData();

@@ -1,0 +1,2 @@
+../User/Src/vixUartQueue.c:12:6:INIT_UartQueue	1
+../User/Src/vixUartQueue.c:20:10:OPEN_Uart	1

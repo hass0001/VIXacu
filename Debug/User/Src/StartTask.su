@@ -1,0 +1,7 @@
+../User/Src/StartTask.c:17:6:SystemTask	136	static
+../User/Src/StartTask.c:128:6:FireStatusReload	4	static
+../User/Src/StartTask.c:133:6:ResetStatus	4	static
+../User/Src/StartTask.c:140:6:CheckSystemInitial	16	static
+../User/Src/StartTask.c:179:6:ReloadParameter	32	static
+../User/Src/StartTask.c:263:6:ReadTimeCodeFromEeprom	16	static
+../User/Src/StartTask.c:290:6:InitRTC	16	static

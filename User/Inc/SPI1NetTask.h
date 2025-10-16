@@ -163,6 +163,7 @@
 #define TA_StrCmdCheckApbID            0x4948  //  ("IH")  //  ID�ڷ� Anti-passback ���� Ȯ��.
 #define TA_StrCmdInitApbIDAll          0x4949  //  ("II")   //  ID�ڷ� Anti-passback ��ü �ʱ�ȭ.
 #define TA_StrCmdDeleteIDBlock 	       0x494A  //  ("IJ")  //  ID�ڷ� Ư������ ����.
+#define TA_StrCmdGetIDContent 	       0x494C  //  ("IL")  //  ID의 내용을 전달한다.
 #define TA_StrCmdSetDoorZone           0x4441  //  ("DA")  //  DOOR ZONE ���� ����.
 #define TA_StrCmdChkDoorzone           0x4442  //  ("DB")  //  DOOR ZONE ���� Ȯ��. 
 #define TA_StrCmdDelDoorZone           0x4443  //  ("DC")  //  DOOR ZONE ���� ����.
@@ -226,6 +227,7 @@
 #define TA_FWUPDATE_TAIL               0x4654      //"FT"
 #define TA_FWUPDATE_END                0x4645      //"FE"
 
+#define TA_StrCmdLogDisp       0x4C47  //  ("LG")  //  Log display 하기 위함
 
 // u-id Data Type
 #define UHS_Type_ReqDevConnection	    0       // 202

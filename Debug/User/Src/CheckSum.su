@@ -1,0 +1,3 @@
+../User/Src/CheckSum.c:5:10:getExtFlashCRC	32	static
+../User/Src/CheckSum.c:25:6:makeCrcGlobalTable	8	static
+../User/Src/CheckSum.c:42:6:makeCRCtable	32	static

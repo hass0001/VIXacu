@@ -1,0 +1,7 @@
+../User/Src/WiegandTask.c:20:6:WiegandProcess	8	static
+../User/Src/WiegandTask.c:27:6:Wiegand_reset_port	16	static
+../User/Src/WiegandTask.c:53:6:Wiegand_init_value	16	static
+../User/Src/WiegandTask.c:63:6:Check_Wiegand_Input	88	static
+../User/Src/WiegandTask.c:219:10:funcConverAsciiArr2U32	48	static
+../User/Src/WiegandTask.c:292:6:WiegandSetInputData	64	static,ignoring_inline_asm
+../User/Src/WiegandTask.c:342:6:HAL_GPIO_EXTI_Callback	16	static

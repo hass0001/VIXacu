@@ -1,0 +1,17 @@
+../User/Src/Flashrom.c:22:6:SPI2_sFlash_Init	1
+../User/Src/Flashrom.c:45:10:CheckRfCardDataInFlash	25
+../User/Src/Flashrom.c:229:9:ClearRfCardIndexOnSerialFlash	4
+../User/Src/Flashrom.c:269:9:WriteRfCardDataToSerialFlash	2
+../User/Src/Flashrom.c:302:9:OverWriteRfCardDataToSerialFlash	18
+../User/Src/Flashrom.c:453:9:NewWriteRfCardDataToSerialFlash	12
+../User/Src/Flashrom.c:597:9:CheckDefaultCard	29
+../User/Src/Flashrom.c:626:9:WriteRfCardDataBlockToSerialFlash	1
+../User/Src/Flashrom.c:645:9:DeleteRfCardDataOnSerialFlash	17
+../User/Src/Flashrom.c:744:10:GetRfCardDataInFlash	4
+../User/Src/Flashrom.c:779:10:GetRfCardCountInFlash	8
+../User/Src/Flashrom.c:827:9:EraseSFlash	2
+../User/Src/Flashrom.c:843:9:ClearCardDataOfSerialFlashAll	1
+../User/Src/Flashrom.c:875:6:WriteSFlash4kSectorData	2
+../User/Src/Flashrom.c:904:9:AddAuthorityToSerialFlash	2
+../User/Src/Flashrom.c:949:9:DeleteAuthorityFromSerialFlash	2
+../User/Src/Flashrom.c:978:9:GetAuthorityFromSerialFlash	2

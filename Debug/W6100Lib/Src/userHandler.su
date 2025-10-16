@@ -1,0 +1,4 @@
+../W6100Lib/Src/userHandler.c:40:9:predefined_get_cgi_processor	32	static
+../W6100Lib/Src/userHandler.c:65:9:predefined_set_cgi_processor	32	static
+../W6100Lib/Src/userHandler.c:93:6:make_json_netinfo	168	static
+../W6100Lib/Src/userHandler.c:115:8:set_diostate	24	static

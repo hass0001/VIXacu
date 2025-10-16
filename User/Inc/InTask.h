@@ -69,13 +69,13 @@ INP_EXT INT16U DoorTimerCnt;
 INP_EXT INT16U DoorTimerSet;
 
 INP_EXT INT8U FireOccurrence;
-INP_EXT INT8U FireLockFlag;
-INP_EXT uint8_t FireAlertCnt;
+INP_EXT INT8U FireLockFlag; //화재발생작동모드이면 119 아니면 0, 비작동모드이면 99
+INP_EXT INT8U FireAlertCnt;
 INP_EXT INT8U isFireAlertOccur;
 
 INP_EXT INT8U TamperOccurrence;
 INP_EXT INT8U TamperLockFlag;
-INP_EXT uint8_t TamperAlertCnt;
+INP_EXT INT8U TamperAlertCnt;
 INP_EXT INT8U isTamperAlertOccur;
 
 INP_EXT INT8U gU8ACUnum;

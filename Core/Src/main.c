@@ -126,7 +126,7 @@ int main(void)
   MX_OCTOSPI1_Init();
   MX_UART4_Init();
   MX_USART1_UART_Init();
-  MX_SPI1_Init();
+  MX_SPI1_Init(); 
   MX_CRC_Init();
   MX_HASH_Init();
   MX_RNG_Init();
@@ -144,19 +144,10 @@ int main(void)
   /* USER CODE BEGIN 2 */
   //MX_ADC1_Init();
 
-	HAL_TIM_Base_Start_IT(&htim7);  // �????�� ?���??? ???���??? 초기 ?��?��
+  HAL_TIM_Base_Start_IT(&htim7);  // �????�� ?���??? ???���??? 초기 ?��?��
 
-//	TEST_Eeprom();
-//  INIT_Relays(_OFF);
-//  INIT_TTLOut(_OFF);
-//  INIT_StatusLeds(_OFF);
- // INIT_ArrayLeds(_OFF);
-	fOpenEthernet = 0;
+  fOpenEthernet = 0;
   //CREATE_DebugConsoleMutex();
-#if 0
-setvbuf(stdin, NULL, _IONBF, 0);
-//setvbuf(stdout, NULL, _IONBF, 0);
-#endif
 
   //printf("printf: VIXacu\r\n");
   //Dprintf("VIXacu\r\n");
@@ -166,19 +157,23 @@ setvbuf(stdin, NULL, _IONBF, 0);
   //OPEN_ArrayLED();
   //xOpen_EepromMutex();
 
+#ifdef DEBUG_MODE
    // TEST_Eeprom();
- //  TEST_ExNorFlash();
+//   TEST_ExNorFlash();
    // TestLockOut();
    //TEST_RNG();
    //TEST_ExRTC();
    //TEST_LedDriver();
    //TEST_CRC32();
    //TEST_TTLOut(_TTL_OUT);
+#endif
+
    RTC_Initial();
    RS485_Init();
    InputInit();
    SCI1FwdTaskInit();
    PCALED_Init();
+   QUEUE_Init_Ring_Queues();
 
    SystemTask();	// ?�� ?��?���??????? ?��?�� 값을 ?��?�� ?���??????? ?��?��?�� ?��?��.
 
@@ -194,17 +189,40 @@ setvbuf(stdin, NULL, _IONBF, 0);
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 //   xOSPI_EraseChip();
- //  TEST_ExNorFlash();
- //  ATE_Test_AddAuth();
 #ifdef DEBUG_MODE
-  ATE_Test_VixpassSchedule();
+//   ATE_Test_SetTime();
+  //  TEST_ExNorFlash();
+//  ATE_Test_AddAuth();
+//    ATE_Test_VixpassSchedule();
+//  ATE_Test_DoorSync();
+//   cB84B3C
+ //  B798753C
+
+	uint8_t wiegand[4];   // 4462d901
+	wiegand[0] = 0x97; wiegand[1] = 0x84; wiegand[2] = 0x4B; wiegand[3] = 0x3C;
+	ATE_Test_ID(wiegand);
+	/*
+	 * 	wiegand[0] = 0xD5; wiegand[1] = 0x84; wiegand[2] = 0xA1; wiegand[3] = 0x9A;
+	ATE_Test_ID(wiegand);
+	wiegand[0] = 0x00; wiegand[1] = 0x49; wiegand[2] = 0x12; wiegand[3] = 0x7C;
+	ATE_Test_ID(wiegand);
+	wiegand[0] = 0x7C; wiegand[1] = 0x0C; wiegand[2] = 0x12; wiegand[3] = 0x7C;
+	ATE_Test_ID(wiegand);
+	wiegand[0] = 0x00; wiegand[1] = 0x18; wiegand[2] = 0x12; wiegand[3] = 0x7B;
+	ATE_Test_ID(wiegand);
+*/
 #endif
+
 	while (1)
 	{
 		SerialCommandProcess();
-		SCI2Rs485Process();
-		WiegandProcess();
 
+#ifdef GUUI_PULLMAN_485
+		SCI2Rs485Process();
+#endif
+#ifdef KTWEST_WIEGAND
+		WiegandProcess();
+#endif
 		SPI1NetTask();
 		InProcess();
 

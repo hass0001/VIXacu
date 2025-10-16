@@ -952,7 +952,7 @@ void TEST_ExNorFlash(void)
 {
 	uint16_t q, r, i=1;
 	uint16_t count;
-	static uint32_t addr=0x9b8000;
+	static uint32_t addr=0x9b8000;  // 32M
 	uint32_t sector=0x9b8;
 	uint32_t block=0x9b0000;
 

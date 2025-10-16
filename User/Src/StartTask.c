@@ -164,7 +164,7 @@ void CheckSystemInitial(void)
 
 		ScheduleInitial();
 
-		EraseSFlash(FLASH_MpCardData_Start, FLASH_MpCardData_End);//== ClearCardDataOfSerialFlashAll();
+//		EraseSFlash(FLASH_MpCardData_Start, FLASH_MpCardData_End);//== ClearCardDataOfSerialFlashAll();
 		EraseSFlash(FLASH_RfCardData_Start, FLASH_RfCardData_End);//== ClearCardDataOfSerialFlashAll();
 	}
 	

@@ -540,7 +540,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 	static uint16_t t1msTim1 = 0;
 	static uint16_t t10msTim2 = 0;
-	static uint16_t t1sTim4 = 0;
+	static uint16_t t100msTim4 = 0;
 	static uint16_t t12_100msCnt = 0;
 	static uint16_t t50msTim5_Pca = 0;
 
@@ -554,24 +554,28 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	case (uint32_t)TIM3: 	/* 485 1ms Delay  */
 		t1msTim3_485++;
 		if( 3 == t1msTim3_485) {   // 3 ms
+#ifdef GUUI_PULLMAN_485
 			if( gGoVect == 1)
 				ConsoleCommProcess();//
+#endif
 			t1msTim3_485 = 0;
 		}
 		break;
 	case (uint32_t)TIM4: 	/* HTTPC heartbeat  */
-//		t1sTim4++;
-//		if( t1sTim4 >= 2)
+			t100msTim4++;
+//		if( t100msTim4 >= 2)
 //		{
 			flag_sent_http_request = ENABLE;
-//			t1sTim4 = 0;
+//			t100msTim4 = 0;
 //		}
 		break;
 	case (uint32_t)TIM5:	/* PCALED Run  */
 		t50msTim5_Pca++;
 		if( t50msTim5_Pca > 3)
 		{
+#ifdef KTWEST_WIEGAND
 			PCALED_TIM2HandlerProc();
+#endif
 			t50msTim5_Pca = 0;
 		}
 		break;

@@ -1,0 +1,6 @@
+../User/Src/I2C_Eeprom.c:107:6:nItem	1
+../User/Src/I2C_Eeprom.c:116:10:ReadNumCardFromEeprom	1
+../User/Src/I2C_Eeprom.c:124:9:EEPROMGetData	1
+../User/Src/I2C_Eeprom.c:133:9:EEPROMSetData	2
+../User/Src/I2C_Eeprom.c:143:9:EEPROMGetDataBlock	2
+../User/Src/I2C_Eeprom.c:152:9:EEPROMSetDataBlock	4

@@ -18,7 +18,8 @@
 
 #include   "History.h"
 
-extern stRtLog stRealtimeLog;
+extern unionRtLog_Parameter stRealtimeLog;
+extern uint8_t gSetEventRtlog;
 
 void SaveEventLog2EEprom_sFlash(void)
 {
@@ -136,9 +137,12 @@ uint8_t CheckEventCardAndLog( uint8_t nPort, uint8_t * u8CardData, uint16_t u16C
   if((u16CardResult&0x000F) == Card_Registerd_OK )
   {  //Card_Registerd_OK 0
     u8DoorAuth = (uint8_t) (u16CardResult >> 8);
-    if(LockParameter.SelectDoor[nPort] & u8DoorAuth)   // 락과 연동된 출입문 번호의 권한을 체크
+//    if(LockParameter.SelectDoor[nPort] & u8DoorAuth)   // 락과 연동된 출입문 번호의 권한을 체크
+    uint8_t nauth = (0x80 >> nPort);
+    if(nauth & u8DoorAuth)   // 락과 연동된 출입문 번호의 권한을 체크
     {	//배정된 출입문에 해당 권한이 있으면 아래 진행.. SelectDoor 에는 해당 입력포트(485id, wiegand port)에 대응하는 lock 번호가 저장되어 있음..
 //        if(u16CardResult & (0x8000 >> nPort)) {//해당 출입문에 출입권한이 있으면..8개
+
       u8CardType = (uint8_t)((u16CardResult>>4)&0x07); // ???? ???? ?111 ???? 이기 때문에..
       u8ArrLogdata[3] = u8ArrCardCode[u8CardType];//{'M', 'C', 'P', 'F', 'L', 'S', 'D', 'A'};
 
@@ -197,15 +201,17 @@ uint8_t CheckEventCardAndLog( uint8_t nPort, uint8_t * u8CardData, uint16_t u16C
               break;
             case LockMode_Normal ://0x01
             case LockMode_Schedule_Lock ://0x21
-              if(u8CardType != 4)
+
+//              if(u8CardType != 4)
 			  { //종류 : 출입시간제한카드(4)가 아니라면..
                 ReleaseLockSelectDoor(CMSParameter.DoorOpenTime[nPort], nPort, u8DoorAuth);
 //                    ControlDoor(CMSParameter.DoorOpenTime[nPort], nPort);
                 u8ArrLogdata[4] = 0x00; //data-event내용1 정상
                 break;
               }
-              else 
+/*              else
 			  {        //출입시간제한카드(4) 일 때 타임코드를 체크해서 출입시간이면 열어줌..
+
                  for(i=0; i<3; i++)
 				 {
                   nCode = CMSParameter.LimitCardTimeCode[nPort][i];//새끼줄 값 가져와서..
@@ -229,7 +235,8 @@ uint8_t CheckEventCardAndLog( uint8_t nPort, uint8_t * u8CardData, uint16_t u16C
                     u8ArrLogdata[4] = 0x0E; //data-event내용1 - 출입시간아님.
                   }
                 }//end for
-              }
+ //             }
+  * */
               break;
             case LockMode_NotUse ://0x00
             case LockMode_Unknown ://0xFF
@@ -241,7 +248,8 @@ uint8_t CheckEventCardAndLog( uint8_t nPort, uint8_t * u8CardData, uint16_t u16C
         }
         case 5 :
         {//0000 0000 ?101 0000 종류 : 특별카드(5)
-          switch(LockParameter.DoorLockMode[nPort]){
+          switch(LockParameter.DoorLockMode[nPort])
+          {
             case LockMode_Manual_Unlock ://0x10
               u8ArrLogdata[4] = 0x0B; //data-event내용1 수동풀림상태
               break;
@@ -281,10 +289,22 @@ uint8_t CheckEventCardAndLog( uint8_t nPort, uint8_t * u8CardData, uint16_t u16C
     }
     else
     {  // acu 에 카드값은 있으나 출입문 권한이 없음..
-        printf( "CheckEventCardAndLog  Card_No_Autho u16CardResult=%04X, u8DoorAuth=%02X,  u8CardType=%02X", u16CardResult, u8DoorAuth, u8CardType);
+       printf( "CheckEventCardAndLog  LockParameter.SelectDoor[%02ㅌ]=%02X, u8DoorAuth=%02X\r\n", nPort, LockParameter.SelectDoor[nPort], u8DoorAuth);
+       printf( "CheckEventCardAndLog  Card_No_Autho u16CardResult=%04X, u8DoorAuth=%02X,  u8CardType=%02X", u16CardResult, u8DoorAuth, u8CardType);
       u8ArrLogdata[3] = 'X';//0x58; //'X' 권한없음.. "CX"
       u8ArrLogdata[4] = 0x0D; //출입 권한없음..
-      nResult = Result_Wrong_Zone;
+#ifdef ALLCARD_GRANT_MODE
+    nResult = Result_OK;
+#else
+	#ifdef GUUI_PORT_GRANTED
+		ReleaseLockSelectDoor(CMSParameter.DoorOpenTime[nPort], nPort, u8DoorAuth);
+	//              ControlDoor(CMSParameter.DoorOpenTime[nPort], nPort);
+		 u8ArrLogdata[4] = 0x00; //data-event내용1 정상
+	     nResult = Result_OK;
+	 	#else
+		 nResult = Result_Wrong_Zone;
+	#endif
+#endif
     }
   }
   else if((u16CardResult&0x000F) == Card_No_Granted )
@@ -292,14 +312,25 @@ uint8_t CheckEventCardAndLog( uint8_t nPort, uint8_t * u8CardData, uint16_t u16C
     printf( "CheckEventCardAndLog  Card_No_Granted u16CardResult=%04X, u8DoorAuth=%02X,  u8CardType=%02X", u16CardResult, u8DoorAuth, u8CardType);
     u8ArrLogdata[3] = (u8CardType == 2) ? 'P':'F'; //'P' 임시,단기(방문), 'F' 당일..
     u8ArrLogdata[4] = 0x06; //data-event내용1,    0x06 : "-출입기간X"
+#ifdef ALLCARD_GRANT_MODE
+    nResult = Result_OK;
+#else
     nResult = Card_No_Granted;
+ #endif
   }
   else
   {    //Card_Not_Registerd 3
 	printf( "CheckEventCardAndLog  Card_Not_Registerd u16CardResult=%04X, u8DoorAuth=%02X,  u8CardType=%02X", u16CardResult, u8DoorAuth, u8CardType);
+#ifdef ALLCARD_GRANT_MODE
+    u8ArrLogdata[3] = 'C';// //'C' 등록..
+    u8ArrLogdata[4] = 0x00; //data-event내용1 - 정상
+    nResult = Result_OK;
+#else
     u8ArrLogdata[3] = 'N';//0x4E; //'N' 미등록..
     u8ArrLogdata[4] = 0x00; //data-event내용
     nResult = Card_Not_Registerd;
+#endif
+
   }
 
   u8ArrLogdata[5] = nPort; //data-event내용2  출입문 번호 0~3
@@ -325,7 +356,7 @@ uint8_t CheckEventCardAndLog( uint8_t nPort, uint8_t * u8CardData, uint16_t u16C
   SaveEventLog2EEprom_sFlash();//2. log count는 이 함수에서 올림..
 //      gU8LogCountFlag = 0;//멈춤 해제..
 
-	if( httpc_isConnected)  // http 서버 모드 이면 httpclient로 접속
+//	if( httpc_isConnected)  // http 서버 모드 이면 httpclient로 접속
 	{
 		HTTP_MakeHttpPacketRtLog( nPort, HTTP_EVENT_ACCESS_CODE, HTTP_VERIFYTYPE_CARD , nResult);
 	}
@@ -345,7 +376,7 @@ uint8_t CheckEventCardAndLog( uint8_t nPort, uint8_t * u8CardData, uint16_t u16C
 				  }
 				}
 			}
-			TAMakeResponsePacket(TA_StrCmdAckEvent);//TA_StrCmdGetEvent  0x4542  //  ("EB")  //  EVENT UPLOAD
+			TAMakeResponsePacket(TA_StrCmdAckEvent);//  //  ("EA")  //  EVENT ping Ack.. EB �޽����� ���������..TA_StrCmdGetEvent  0x4542  //  ("EB")  //  EVENT UPLOAD
 		  }
 	  }
 
@@ -376,8 +407,10 @@ bool CheckInSchedule(uint8_t u8StartHh, uint8_t u8StartMm, uint8_t u8EndHh, uint
   {
     nCurrTimeMin =   (toDayTime.HOUR*60)+toDayTime.MIN; //현재시간을 분으로..
     
-    if(( (nSchedStartMin < nSchedEndMin)&&(nCurrTimeMin >= nSchedStartMin &&  nCurrTimeMin <= nSchedEndMin) )||
-       ( (nSchedStartMin > nSchedEndMin)&&(nCurrTimeMin >= nSchedStartMin ||  nCurrTimeMin <= nSchedEndMin) ))
+    if(( (nSchedStartMin < nSchedEndMin) &&
+    	 (nCurrTimeMin >= nSchedStartMin && nCurrTimeMin <= nSchedEndMin) ) ||
+       ( (nSchedStartMin > nSchedEndMin) &&
+         (nCurrTimeMin >= nSchedStartMin ||  nCurrTimeMin <= nSchedEndMin) ))
     {
       return true;//스케줄에 들어감..
     }

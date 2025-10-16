@@ -120,6 +120,86 @@ void PCALED_SetSensorLed(uint8_t nSensor, uint8_t nOn)
 	HAL_I2C_Master_Transmit( &hi2c1,  I2C_PCA9552_SLAVE_ADDR, pcsSetting, 2, HAL_MAX_DELAY);
 }
 
+void PCALED_SetButtonLed(uint8_t nButton, uint8_t nOn)
+{
+	uint8_t pcsSetting[9] = { 0x06, 0xFA };
+	switch(nButton)
+	{
+	case 0:  // ADC1 -> LED0
+		{
+			pcsSetting[0] = 0x06;
+			if(nOn == 1)
+			{
+				gPcaLed[0] &= 0xFC;
+	//			gPcaLed[0] |= 0x00;
+			}
+			else
+			{
+				gPcaLed[0] &= 0xFC;
+				gPcaLed[0] |= 0x01;
+			}
+			pcsSetting[1] = gPcaLed[0];
+			break;
+		}
+	case 1:  // ADC4 -> LED3
+		{
+			pcsSetting[0] = 0x06;
+			if(nOn == 1)
+			{
+				gPcaLed[0] &= 0x3F;
+	//			gPcaLed[0] |= 0x00;
+			}
+			else
+			{
+				gPcaLed[0] &= 0x3F;
+				gPcaLed[0] |= 0x40;
+			}
+			pcsSetting[1] = gPcaLed[0];
+			break;
+		}
+	case 2:	  // ADC12 -> LED8
+		{
+			pcsSetting[0] = 0x08;
+			if(nOn == 1)
+			{
+				gPcaLed[2] &= 0xFC;
+	//			gPcaLed[2] |= 0x00;
+			}
+			else
+			{
+				gPcaLed[2] &= 0xFC;
+				gPcaLed[2] |= 0x01;
+			}
+			pcsSetting[1] = gPcaLed[2];
+			break;
+		}
+	case 3:	  // ADC15 -> LED11
+		{
+			pcsSetting[0] = 0x08;
+			if(nOn == 1)
+			{
+				gPcaLed[2] &= 0x3F;
+	//			gPcaLed[2] |= 0x00;
+			}
+			else
+			{
+				gPcaLed[2] &= 0x3F;
+				gPcaLed[2] |= 0x40;
+			}
+			pcsSetting[1] = gPcaLed[2];
+			break;
+		}
+	default:
+		{
+			pcsSetting[0] = 0x09;
+			pcsSetting[1] = 0x5A;
+			break;
+		}
+	}
+
+	HAL_I2C_Master_Transmit( &hi2c1,  I2C_PCA9552_SLAVE_ADDR, pcsSetting, 2, HAL_MAX_DELAY);
+}
+
 void PCALED_TIM2HandlerProc(void)
 {
 	static uint8_t nLedStep = 0;
@@ -141,6 +221,26 @@ void PCALED_TIM2HandlerProc(void)
 	if( nLedStep >= 7)
 		nLedStep = 0;
 }
+
+
+void PCALED_485TxNoticeProc(uint8_t nLedStep)
+{
+	uint8_t pcsSetting[2] = { 0x09, 0x00 };  // Control LED12 to LED15 Not Increment
+	// 01 01 01 01 // 00 01 01 01 // 00 00 01 01 // 00 00 00 01 // 01 00 00 00 // 01 01 00 00 // 01 01 01 00
+	switch(nLedStep)
+	{
+	case 0:		pcsSetting[1] = 0x15;		break;
+	case 1:		pcsSetting[1] = 0x05;		break;
+	case 2:		pcsSetting[1] = 0x01;		break;
+	case 3:		pcsSetting[1] = 0x40;		break;
+	case 4:		pcsSetting[1] = 0x50;		break;
+	case 5:		pcsSetting[1] = 0x54;		break;
+	case 6:		pcsSetting[1] = 0x55;		break;
+	default: 	pcsSetting[1] = 0x00;		break;
+	}
+	HAL_I2C_Master_Transmit( &hi2c1,  I2C_PCA9552_SLAVE_ADDR, pcsSetting, 2, HAL_MAX_DELAY);
+}
+
 
 uint8_t PCALED_Check_Timer5_Alive(void)
 {

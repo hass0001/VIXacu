@@ -1,0 +1,5 @@
+../User/Src/des.c:104:6:print_char_as_binary	3
+../User/Src/des.c:116:6:generate_key	2
+../User/Src/des.c:123:6:print_key_set	4
+../User/Src/des.c:148:6:generate_sub_keys	15
+../User/Src/des.c:246:6:process_message	22

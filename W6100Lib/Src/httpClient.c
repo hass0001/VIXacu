@@ -14,7 +14,6 @@
 #include "vixConfig.h"
 #include "httpUtil.h"
 
-// #define _HTTPCLIENT_DEBUG_
 extern uint16_t t50msTim6_Net;
 /* Private variables ---------------------------------------------------------*/
 extern unsigned char *base64_decode(const char *data,
@@ -32,15 +31,20 @@ extern HTTP_ClientCommTypeDef HTTP_ClientComm;
 //HTTPC_FlowCtrlTypeDef HTTPC_FlowCtrl;
 _HTTPC_GetPostTypeDef HTTP_RestCmd[MAX_NUM_DOOR];
 
-uint8_t * httpc_Header_buf;
-uint8_t * httpc_Body_buf;
+uint8_t * httpc_header_buf;
+uint8_t * httpc_body_buf;
 uint8_t * httpc_send_buf;
 uint8_t * httpc_recv_buf;
+
+uint8_t httpc_check_buf[2048];
 
 static int8_t httpsock = 0;
 static uint8_t dest_ip[16] = {0, };
 static uint16_t dest_port = 0;
 static uint16_t httpc_any_port = 0;
+
+uint8_t gSetEventRtlog;
+uint8_t gcntEventRtAcc;
 
 uint8_t httpc_isSockOpen = HTTPC_FALSE;
 uint8_t httpc_isConnected = HTTPC_FALSE;
@@ -49,17 +53,20 @@ uint16_t httpc_isReceived = HTTPC_FALSE;
 uint8_t flag_sent_http_request = ENABLE;
 uint8_t flag_recv_http_request = ENABLE;
 
-stRtLog stRealtimeLog;
+unionRtLog_Parameter stRealtimeLog;
+gStMsgList pBuzzMsg;
+gStRtlogList pRtlogMsg;
+
 /* Private functions prototypes ----------------------------------------------*/
 uint16_t get_httpc_any_port(void);
 extern wiz_NetInfo gWIZNETINFO;
 /* Public & Private functions ------------------------------------------------*/
 
-uint8_t httpc_init(uint8_t sock, uint8_t * ip, uint16_t port, uint8_t * sbuf, uint8_t * rbuf)
+uint8_t httpc_init(uint8_t sock, uint8_t * ip, uint16_t port, uint8_t * sbuf, uint8_t * rbuf, uint8_t * hbuf, uint8_t * bbuf)
 {
 	uint8_t ret = HTTPC_FALSE;
 	
-	stRealtimeLog.index = 110;
+	stRealtimeLog.stRtLog.index = 110;
 	if(sock <= _WIZCHIP_SOCK_NUM_)
 	{
 		// Hardware socket number for HTTP client (0 ~ 7)
@@ -68,7 +75,9 @@ uint8_t httpc_init(uint8_t sock, uint8_t * ip, uint16_t port, uint8_t * sbuf, ui
 		// Shared buffers: HTTP Send / Recevice
 		httpc_send_buf = sbuf;
 		httpc_recv_buf = rbuf;
-		
+		httpc_header_buf = hbuf;
+		httpc_body_buf = bbuf;
+
 		// Destination IP address and Port number
 		// (Destination = HTTP server)
 		dest_ip[0] = ip[0];
@@ -91,6 +100,7 @@ uint8_t httpc_init(uint8_t sock, uint8_t * ip, uint16_t port, uint8_t * sbuf, ui
 		dest_port = port;
 		
 		ret = HTTPC_TRUE;
+		flag_sent_http_request = ENABLE;
 	}
 	
 	return ret;
@@ -103,7 +113,7 @@ uint8_t httpc_connection_handler(uint8_t addr_len)
 	
 	uint16_t source_port;
 
-#ifdef _HTTPCLIENT_DEBUG_
+#ifdef xDEBUG_MODE
 	uint8_t destip[4] = {0, };
 	uint16_t destport = 0;
 #endif
@@ -119,7 +129,7 @@ uint8_t httpc_connection_handler(uint8_t addr_len)
 		case SOCK_ESTABLISHED:
 			if(getSn_IR(httpsock) & Sn_IR_CON)
 			{
-#ifdef _HTTPCLIENT_DEBUG_
+#ifdef xDEBUG_MODE
 				// Serial debug message printout
 				getsockopt(httpsock, SO_DESTIP, &destip);
 				getsockopt(httpsock, SO_DESTPORT, &destport);
@@ -144,7 +154,7 @@ uint8_t httpc_connection_handler(uint8_t addr_len)
 			httpc_isConnected = HTTPC_FALSE;
 			
 			source_port = get_httpc_any_port();
-#ifdef _HTTPCLIENT_DEBUG_
+#ifdef xDEBUG_MODE
 			printf(" > HTTP CLIENT: source_port = %d\r\n", source_port);
 #endif
 			if(addr_len == 4)
@@ -153,7 +163,7 @@ uint8_t httpc_connection_handler(uint8_t addr_len)
 				{
 					if(httpc_isSockOpen == HTTPC_FALSE)
 					{
-	#ifdef _HTTPCLIENT_DEBUG_
+	#ifdef xDEBUG_MODE
 						printf(" > HTTP CLIENT: SOCKOPEN\r\n");
 	#endif
 						httpc_isSockOpen = HTTPC_TRUE;
@@ -165,7 +175,7 @@ uint8_t httpc_connection_handler(uint8_t addr_len)
 				{
 					if(httpc_isSockOpen == HTTPC_FALSE)
 					{
-	#ifdef _HTTPCLIENT_DEBUG_
+	#ifdef xDEBUG_MODE
 						printf(" > HTTP CLIENT: SOCKOPEN\r\n");
 	#endif
 						httpc_isSockOpen = HTTPC_TRUE;
@@ -220,6 +230,12 @@ uint16_t httpc_add_customHeader_field(uint8_t * customHeader_buf, const char * n
 // return: sent header length
 uint16_t httpc_send_header(uint8_t * buf, uint16_t len, uint8_t * customHeader_buf, uint16_t content_len)
 {
+
+/*
+#ifdef DEBUG_MODE
+		printf( "httpc_send_header : %s\r\n",buf);
+#endif
+*/
 	if(httpc_isConnected == HTTPC_TRUE)
 	{
 		// HTTP content type: POST / PUT
@@ -250,16 +266,24 @@ uint16_t httpc_send_header(uint8_t * buf, uint16_t len, uint8_t * customHeader_b
 		}
 		
 		len += sprintf((char *)buf+len, "\r\n");
+/*
 
-#ifdef _HTTPCLIENT_DEBUG_
+#ifdef DEBUG_MODE
 		printf(" >> HTTP Request header - Method: %s, URI: %s, Content-Length: %d\r\n", req->method, req->uri, content_len);
 		printf("%s", buf);
 #endif
+*/
 		send(httpsock, buf, len);
 	}
 	else
 	{
 		len = HTTPC_FAILED;
+		/*
+
+		#ifdef DEBUG_MODE
+				printf(" >> HTTP HTTPC_FAILED: \r\n");
+		#endif
+		*/
 	}
 	
 	return len;
@@ -271,15 +295,21 @@ uint16_t httpc_send_body(uint8_t * buf, uint16_t len)
 {
 	uint16_t sentlen = 0;
 
-#ifdef _HTTPCLIENT_DEBUG_
+/*
+#ifdef xDEBUG_MODE
+		printf( "httpc_send_body : %s\r\n",buf);
+#endif
+
+#ifdef xDEBUG_MODE
 	uint16_t i;
 #endif
-	
-	if(( httpc_isConnected == HTTPC_TRUE) && (len > 0)){
-		do{
+*/
+	if(( httpc_isConnected == HTTPC_TRUE) && (len > 0))
+	{
+		do
+		{
 			sentlen += send(httpsock, buf, len);
 		} while(sentlen < len);
-
 	}
 //	else
 //	{
@@ -314,14 +344,14 @@ uint8_t httpc_disconnect(void)
 	
 	if(httpc_isConnected == HTTPC_TRUE)
 	{
-#ifdef _HTTPCLIENT_DEBUG_
+#ifdef xDEBUG_MODE
 		//printf(" > HTTP CLIENT: Try to disconnect\r\n");
 #endif
 		ret = disconnect(httpsock);
 		if(ret == SOCK_OK)
 		{
 			ret = HTTPC_TRUE;
-#ifdef _HTTPCLIENT_DEBUG_
+#ifdef xDEBUG_MODE
 			//printf(" > HTTP CLIENT: Disconnected\r\n");
 #endif
 		}
@@ -351,7 +381,88 @@ uint16_t get_httpc_any_port(void)
 	return httpc_any_port;
 }
 
+static uint16_t remainingSendTime = 0;
+static uint16_t remainingRecvTime = 0;
+
 static uint16_t remainingTime = 0;
+
+#if 0
+void HTTPClient_Handler(void)
+{
+
+	uint16_t headerSize = 0;
+	uint16_t bodySize = 0;
+
+	httpc_connection_handler(4);
+
+	if(httpc_isSockOpen)
+	{
+		httpc_connect(4);
+	}
+
+	// HTTP client example
+	if(httpc_isConnected)
+	{
+
+		if( flag_sent_http_request == ENABLE)
+		{
+			flag_sent_http_request = DISABLE;
+
+			xPROT_HTTPC_PostDevice(httpc_header_buf, &headerSize, httpc_body_buf, &bodySize);
+			{
+
+				httpc_send_header( httpc_header_buf, headerSize, NULL, bodySize);
+				httpc_send_body(httpc_body_buf, bodySize); // Send HTTP requset message body
+
+#ifdef DEBUG_MODE
+				uint8_t nMainType = GET_HTTPC_HeartType();
+				if(nMainType == UHS_Type_RtLog)
+				{
+					printf("HTTPClient_Handler send RTLOG: %s\n%s\n\r", httpc_header_buf, httpc_body_buf);
+				}
+#endif
+			}
+
+		}
+		else
+		{
+				// Recv: HTTP response
+				if(httpc_isReceived > 0)  // 수신한 데이터 수
+				{
+					headerSize = httpc_recv(httpc_recv_buf, httpc_isReceived);
+					memcpy( httpc_check_buf, httpc_recv_buf, httpc_isReceived);
+
+//					printf("httpc_isReceived 입력 %s\r\n", httpc_check_buf);
+
+
+					xPROT_HTTPC_CheckRecv(httpc_check_buf, httpc_isReceived);
+
+					HttpcSubModeStep++;
+					if( HttpcSubModeStep >= MAX_NUM_DOOR)
+						HttpcSubModeStep = 0;
+
+					flag_sent_http_request = ENABLE;
+
+					remainingRecvTime = 0;
+				}
+				else
+				{
+			//		printf("No data received.\r\n");
+					remainingRecvTime++;
+					if( remainingRecvTime > 3000) /// 3 초 경과 ?
+					{
+						flag_sent_http_request = ENABLE;
+						remainingRecvTime = 0;
+						printf("HTTPClient_Handler 입력 idle recv 0. 3000\r\n");
+					}
+				}
+			}
+//		}
+	}
+
+	return;
+}
+#else
 void HTTPClient_Handler(void)
 {
 
@@ -368,14 +479,23 @@ void HTTPClient_Handler(void)
 	// HTTP client example
 	if(httpc_isConnected)
 	{
-		if( (flag_recv_http_request == ENABLE) && (flag_sent_http_request == ENABLE) )
+		if( (flag_recv_http_request == ENABLE) && (flag_sent_http_request == ENABLE) )  // timer 가 sent 를 ENABLE
 		{
 			flag_recv_http_request = DISABLE;
 
-			xPROT_HTTPC_PostDevice(httpc_recv_buf, &headerSize, httpc_send_buf, &bodySize);
+			xPROT_HTTPC_PostDevice(httpc_header_buf, &headerSize, httpc_body_buf, &bodySize);
 			{
-				httpc_send_header( httpc_recv_buf, headerSize, NULL, bodySize);
-				httpc_send_body(httpc_send_buf, bodySize); // Send HTTP requset message body
+
+				httpc_send_header( httpc_header_buf, headerSize, NULL, bodySize);
+				httpc_send_body(httpc_body_buf, bodySize); // Send HTTP requset message body
+
+#ifdef DEBUG_MODE
+				uint8_t nMainType = GET_HTTPC_HeartType();
+				if(nMainType == UHS_Type_RtLog)
+				{
+					printf("HTTPClient_Handler send RTLOG: %s\n%s\n\r", httpc_header_buf, httpc_body_buf);
+				}
+#endif
 			}
 
 			flag_sent_http_request = DISABLE;
@@ -384,7 +504,7 @@ void HTTPClient_Handler(void)
 		else
 		{
 			remainingTime++;
-			if( remainingTime > 30000) /// 30 초 경과 ?
+			if( remainingTime > 150) /// 1 초 경과 ? 아무것도 들어오지 않았던 시간
 			{
 				remainingTime = 0;
 				flag_recv_http_request = ENABLE;
@@ -396,21 +516,24 @@ void HTTPClient_Handler(void)
 		if(httpc_isReceived > 0)
 		{
 			headerSize = httpc_recv(httpc_recv_buf, httpc_isReceived);
-			xPROT_HTTPC_CheckRecv(httpc_recv_buf, httpc_isReceived);
+			memcpy( httpc_check_buf, httpc_recv_buf, httpc_isReceived);
+			xPROT_HTTPC_CheckRecv(httpc_check_buf, httpc_isReceived);
 
 			HttpcSubModeStep++;
 			if( HttpcSubModeStep >= MAX_NUM_DOOR)
 				HttpcSubModeStep = 0;
-			flag_recv_http_request = ENABLE;
+
+			flag_recv_http_request = ENABLE;   // 데이터 처리 후 새로운 요청 보낼 수 있게
 		}
 		else
 		{
-//			printf("No data received.\r\n");
+	//		printf("No data received.\r\n");
 		}
 	}
 
 	return;
 }
+#endif
 
 void xPROT_HTTPC_MakeHeader(uint8_t *restCmd, uint8_t *headerName, uint8_t* pData, uint16_t* Length)
 {
@@ -428,6 +551,8 @@ void xPROT_HTTPC_MakeHeader(uint8_t *restCmd, uint8_t *headerName, uint8_t* pDat
 	*Length = len;
 }
 
+// uint8_t nStTest = 0;
+
 // return: received data length
 ErrState xPROT_HTTPC_CheckRecv(uint8_t * recvBuf, uint16_t recvLen)
 {
@@ -438,6 +563,12 @@ ErrState xPROT_HTTPC_CheckRecv(uint8_t * recvBuf, uint16_t recvLen)
 	uint16_t nPtrSize;
 
 	uint8_t nMainType = GET_HTTPC_HeartType();
+
+#ifdef xDEBUG_MODE
+//	if ( nMainType != UHS_Type_GetRequest)
+		printf( "xPROT_HTTPC_CheckRecv : %s\r\n",recvBuf);
+#endif
+
 	switch( nMainType)
 	{
 	case UHS_Type_RtLog:
@@ -481,6 +612,11 @@ ErrState xPROT_HTTPC_CheckRecv(uint8_t * recvBuf, uint16_t recvLen)
     	{
     		printf("SET OPTIONS_%d:%s\r\n", HttpcSubModeStep, ptr);
     		Httpc_TreatSetOption( recvBuf, recvLen);
+/*			if( nStTest == 0)
+			{
+//				HTTP_TestHttpPacketRtLog();
+				nStTest++;
+			}*/
     	}  // C:384:UPGRADE
     	else if((ptr = strstr( (char const*)recvBuf, "DATA DELETE")) != NULL)
     	{
@@ -544,7 +680,57 @@ ErrState xPROT_HTTPC_CheckRecv(uint8_t * recvBuf, uint16_t recvLen)
 ErrState xPROT_HTTPC_PostDevice(uint8_t* pHeader, uint16_t* pHeaderSize, uint8_t* pBody, uint16_t* pBodySize)
 {
 	uint16_t headerSize=0, bodySize=0;
-	uint8_t nMainType = GET_HTTPC_HeartType();
+	uint8_t nMainType;
+	gStMsgList* BzzData;
+	gStRtlogList*RtData;
+
+
+	RtData = QUEUE_De_Rt_Queue();
+	if(RtData != NULL )  // Queue에 rtLog 가 있다면  // 보낼 이벤트 가 있음
+	{
+#ifdef DEBUG_MODE
+	printf("gSetEventRtlog HttpcSubModeStep 이전 : %02X..%d\n\r", gSetEventRtlog, HttpcSubModeStep);
+
+#endif
+		nMainType = UHS_Type_RtLog;
+		memcpy( stRealtimeLog.u8rtLogParam, RtData->CsMsges, NUM_CS_INDEX_DATA);
+
+		HttpcSubModeStep = RtData->CsPort;
+		gcntEventRtAcc--;
+#ifdef DEBUG_MODE
+		printf("Rtlog 사용 Acc 카운트 : %d\n\r", gcntEventRtAcc);
+	printf("gSetEventRtlog HttpcSubModeStep 바뀐 : %02X..%d\n\r", gSetEventRtlog, HttpcSubModeStep);
+#endif
+
+
+		uint8_t tltBuffer[7];
+		RTC_GetTimeAndDate( &toDayTime, tltBuffer);
+		printf( "보낸 사용 시간 time=20%02d-%02d-%02d %02d:%02d:%02d\r\n",
+				tltBuffer[0], tltBuffer[1], tltBuffer[2], tltBuffer[3], tltBuffer[4], tltBuffer[5]);
+
+	}
+	else
+	{
+		BzzData = QUEUE_De_Cs_Queue(HttpcSubModeStep);
+		if(BzzData != NULL )  // Queue에 rtLog 가 있다면
+		{
+			nMainType = UHS_Type_RtLog;
+			memcpy( stRealtimeLog.u8rtLogParam, BzzData->CsMsges, NUM_CS_INDEX_DATA);
+	#ifdef DEBUG_MODE
+	//	if ( nMainType != UHS_Type_GetRequest)
+			printf("gSetEventRtlog HttpcSubModeStep 이벤트 큐 : %d\n\r", QUEUE_Cnt_Cs_Queue( HttpcSubModeStep));
+			printf( ">>>rtLog>>>이벤트 : pin=%s cardno=%02X%02X%02X%02X%02X%02X%02X%02X sitecode=%d event=%d verifytype=%d\r\n",
+					stRealtimeLog.stRtLog.pin, stRealtimeLog.stRtLog.cardno[0], stRealtimeLog.stRtLog.cardno[1], stRealtimeLog.stRtLog.cardno[2], stRealtimeLog.stRtLog.cardno[3],
+					stRealtimeLog.stRtLog.cardno[4], stRealtimeLog.stRtLog.cardno[5], stRealtimeLog.stRtLog.cardno[6], stRealtimeLog.stRtLog.cardno[7],
+					stRealtimeLog.stRtLog.sitecode, stRealtimeLog.stRtLog.event, stRealtimeLog.stRtLog.verifytype);
+	#endif
+
+		}
+		else
+		{
+			nMainType = GET_HTTPC_HeartType();
+		}
+	}
 
 	switch( nMainType){
 		case UHS_Type_RtLog:
@@ -693,7 +879,7 @@ ErrState xGET_FwUpgradeBody(uint8_t* pBody, uint16_t* Length)
 	if (Firmware_Upgrade == SPI1_UPGRADE_YES)
 	{
 		len = sprintf((char*)pBody, "ID=%s&Return=%d&CMD=%s\r\n\r\n",
-				HTTP_RestCmd[HttpcSubModeStep].chrHttpcCmd, HTTP_RestCmd[HttpcSubModeStep].nHttpcReturn, HTTP_RestCmd[HttpcSubModeStep].Httpc_Command);
+		HTTP_RestCmd[HttpcSubModeStep].chrHttpcCmd, HTTP_RestCmd[HttpcSubModeStep].nHttpcReturn, HTTP_RestCmd[HttpcSubModeStep].Httpc_Command);
 	}
 	else
 	{
@@ -808,21 +994,23 @@ ErrState xPOST_RtLogTableBody(uint8_t* pBody, uint16_t* Length)
 	len = 0;
 	VS_GetVersionStr((char*)tempBuf);
 
+	if( tltBuffer[0] > 27 )
+		tltBuffer[0] = 25;
 	len =  sprintf((char*)pBody+len, "time=20%02d-%02d-%02d %02d:%02d:%02d\t",
 			tltBuffer[0], tltBuffer[1], tltBuffer[2], tltBuffer[3], tltBuffer[4], tltBuffer[5]);
-	len += sprintf((char*)pBody+len, "pin=%s\t", (uint8_t*)stRealtimeLog.pin);
-	len += sprintf((char*)pBody+len, "cardno=%s\t", (uint8_t*) stRealtimeLog.cardno);
-	len += sprintf((char*)pBody+len, "sitecode=%d\t", stRealtimeLog.sitecode);
-	len += sprintf((char*)pBody+len, "linkid=%d\t", stRealtimeLog.linkid);
-	len += sprintf((char*)pBody+len, "eventaddr=%d\t", stRealtimeLog.eventaddr);
-	len += sprintf((char*)pBody+len, "event=%d\t", stRealtimeLog.event);
+	len += sprintf((char*)pBody+len, "pin=%s\t", (uint8_t*)stRealtimeLog.stRtLog.pin);
+	len += sprintf((char*)pBody+len, "cardno=%s\t", (uint8_t*) stRealtimeLog.stRtLog.cardno);
+	len += sprintf((char*)pBody+len, "sitecode=%d\t", stRealtimeLog.stRtLog.sitecode);
+	len += sprintf((char*)pBody+len, "linkid=%d\t", stRealtimeLog.stRtLog.linkid);
+	len += sprintf((char*)pBody+len, "eventaddr=%d\t", stRealtimeLog.stRtLog.eventaddr);
+	len += sprintf((char*)pBody+len, "event=%d\t", stRealtimeLog.stRtLog.event);
 	len += sprintf((char*)pBody+len, "inoutstatus=%d\t", 2);
-	len += sprintf((char*)pBody+len, "verifytype=%d\t", stRealtimeLog.verifytype);
-	len += sprintf((char*)pBody+len, "index=%d\t", stRealtimeLog.index);
-	len += sprintf((char*)pBody+len, "maskflag=%d\t", stRealtimeLog.maskflag);
+	len += sprintf((char*)pBody+len, "verifytype=%d\t", stRealtimeLog.stRtLog.verifytype);
+	len += sprintf((char*)pBody+len, "index=%d\t", stRealtimeLog.stRtLog.index);
+	len += sprintf((char*)pBody+len, "maskflag=%d\t", stRealtimeLog.stRtLog.maskflag);
 	len += sprintf((char*)pBody+len, "temperature=%d\t", 255);
 	len += sprintf((char*)pBody+len, "convtemperature=%d\t", 255);
-	len += sprintf((char*)pBody+len, "attstate=%d\t", stRealtimeLog.attstate);
+	len += sprintf((char*)pBody+len, "attstate=%d\t", stRealtimeLog.stRtLog.attstate);
 	len += sprintf((char*)pBody+len, "bitCount=%d", 16);
 	len += sprintf((char*)pBody+len, "\r\n");
 
@@ -1011,53 +1199,128 @@ void HTTP_MakeHttpPacketRtLog(uint8_t nPort, uint8_t nEvent, uint8_t nVerifyType
 //	Event 221 // 화재발생
 //	Event 220 // 화재복구
 //	로 판단 하면 됩니다. 이때 verifyType은 200 other 입니다.
+	printf("HTTP_MakeHttpPacketRtLog 로그 생성 포트: %d Evt %d, Vet %d\n\r",  nPort, nEvent, nVerifyType);
 
-	HTTP_RestCmd[nPort].HttpcMainModeStep = UHS_Type_RtLog;
-	stRealtimeLog.event = nEvent;
-	stRealtimeLog.verifytype = nVerifyType;
+//	HTTP_RestCmd[nPort].HttpcMainModeStep = UHS_Type_RtLog;
+	stRealtimeLog.stRtLog.event = nEvent;
+	stRealtimeLog.stRtLog.verifytype = nVerifyType;
 	if ( nEvent == HTTP_EVENT_ACCESS_CODE)
 	{
 		if( nReason == Result_OK)
 		{
-			memcpy( stRealtimeLog.pin, CardParameter.stParam.Pin, 8);
-			stRealtimeLog.attstate = 9;	// 출입
+			memcpy( stRealtimeLog.stRtLog.pin, NewCardParam.stParam.Pin, 8);
+			stRealtimeLog.stRtLog.pin[8]='\0';
+			stRealtimeLog.stRtLog.attstate = 9;	// 출입
+
+			gSetEventRtlog = 0x10 + nPort;
+			gcntEventRtAcc++;
+
+#ifdef DEBUG_MODE
+	printf("Rtlog 생성 Acc 카운트 : %d\n\r", gcntEventRtAcc);
+#endif
 		}
 		else if( nReason == Result_Wrong_Zone)
 		{
-			memcpy( stRealtimeLog.pin, CardParameter.stParam.Pin, 8);
-			stRealtimeLog.event = HTTP_EVENT_NO_AUTHOR;
-			stRealtimeLog.verifytype = HTTP_VERIFYTYPE_NO_AUTHOR;
-			stRealtimeLog.attstate = 10;	// 권한없슴
+			memcpy( stRealtimeLog.stRtLog.pin, NewCardParam.stParam.Pin, 8);
+			stRealtimeLog.stRtLog.pin[8]='\0';
+			stRealtimeLog.stRtLog.event = HTTP_EVENT_NO_AUTHOR;
+			stRealtimeLog.stRtLog.verifytype = HTTP_VERIFYTYPE_NO_AUTHOR;
+			stRealtimeLog.stRtLog.attstate = 10;	// 권한없슴
 		}
 		else if( nReason == Card_No_Granted)
 		{
-			memcpy( stRealtimeLog.pin, CardParameter.stParam.Pin, 8);
-			stRealtimeLog.event = HTTP_EVENT_NO_GRANT;
-			stRealtimeLog.verifytype = HTTP_VERIFYTYPE_NO_GRANT;
-			stRealtimeLog.attstate = 11;	// 시간외
+			memcpy( stRealtimeLog.stRtLog.pin, NewCardParam.stParam.Pin, 8);
+			stRealtimeLog.stRtLog.pin[8]='\0';
+			stRealtimeLog.stRtLog.event = HTTP_EVENT_NO_GRANT;
+			stRealtimeLog.stRtLog.verifytype = HTTP_VERIFYTYPE_NO_GRANT;
+			stRealtimeLog.stRtLog.attstate = 11;	// 시간외
 		}
 		else  //Card_Not_Registerd
 		{
-			sprintf(stRealtimeLog.pin, "%d", 0);
-			stRealtimeLog.event = HTTP_EVENT_NOT_REGISTER;
-			stRealtimeLog.verifytype = HTTP_VERIFYTYPE_NOT_REGISTER;
-			stRealtimeLog.attstate = 12;   // 미등록
+			sprintf(stRealtimeLog.stRtLog.pin, "%08d", 0);
+			stRealtimeLog.stRtLog.event = HTTP_EVENT_NOT_REGISTER;
+			stRealtimeLog.stRtLog.verifytype = HTTP_VERIFYTYPE_NOT_REGISTER;
+			stRealtimeLog.stRtLog.attstate = 12;   // 미등록
 		}
-		sprintf(stRealtimeLog.cardno, "%02X%02X%02X%02X", CardParameter.stParam.CardId[0],
-				CardParameter.stParam.CardId[1], CardParameter.stParam.CardId[2], CardParameter.stParam.CardId[3] );
+
+
+#ifdef CARD_2301_ORDER
+		sprintf(stRealtimeLog.stRtLog.cardno, "%02X%02X%02X%02X", NewCardParam.stParam.CardId[2],
+						NewCardParam.stParam.CardId[3], NewCardParam.stParam.CardId[0], NewCardParam.stParam.CardId[1] );
+#else  // CARD 0123 순서
+		sprintf(stRealtimeLog.stRtLog.cardno, "%02X%02X%02X%02X", NewCardParam.stParam.CardId[0],
+							NewCardParam.stParam.CardId[1], NewCardParam.stParam.CardId[2], NewCardParam.stParam.CardId[3] );
+#endif
 	}
 	else
 	{
-		sprintf(stRealtimeLog.pin, "%d", 0);
-		sprintf(stRealtimeLog.cardno, "%d", 0);
+		sprintf(stRealtimeLog.stRtLog.pin, "%d", 0);
+		sprintf(stRealtimeLog.stRtLog.cardno, "%d", 0);
 	}
-	stRealtimeLog.sitecode = 0;
-	stRealtimeLog.linkid = 0;
-	stRealtimeLog.eventaddr = 1;
-	stRealtimeLog.index++;
-	stRealtimeLog.maskflag = 255;
+	stRealtimeLog.stRtLog.sitecode = 0;
+	stRealtimeLog.stRtLog.linkid = 0;
+	stRealtimeLog.stRtLog.eventaddr = 1;
+	stRealtimeLog.stRtLog.index++;
+	stRealtimeLog.stRtLog.maskflag = 255;
+
+	if( gSetEventRtlog & 0x10)  // 보낼 이벤트 가 있음
+	{
+		//  nPort 메세지 큐에 넣는다.
+		pRtlogMsg.CsPort = nPort;
+		memcpy( pRtlogMsg.CsMsges, stRealtimeLog.u8rtLogParam, NUM_CS_INDEX_DATA);
+		QUEUE_En_Rt_Queue(&pRtlogMsg);
+		gSetEventRtlog = 0;
+
+#ifdef DEBUG_MODE
+	printf("HTTP_MakeHttpPacketRtLog 억세스 포트 : %d: 큐 크기 %d\n\r",  nPort, QUEUE_Cnt_Rt_Queue());
+	printf( "억세스 Result Card=%02X%02X%02X%02X, Pin=%c%c%c%c%c%c%c%c, DoorAuth_CardKind=%02X\r\n",
+			NewCardParam.stParam.CardId[0], NewCardParam.stParam.CardId[1], NewCardParam.stParam.CardId[2], NewCardParam.stParam.CardId[3],
+			NewCardParam.stParam.Pin[0], NewCardParam.stParam.Pin[1], NewCardParam.stParam.Pin[2], NewCardParam.stParam.Pin[3],
+			NewCardParam.stParam.Pin[4], NewCardParam.stParam.Pin[5], NewCardParam.stParam.Pin[6], NewCardParam.stParam.Pin[7],
+			NewCardParam.stParam.DoorAuth_CardKind);  //
+#endif
+	}
+	else
+	{
+		//  nPort 메세지 큐에 넣는다.
+		memcpy( pBuzzMsg.CsMsges, stRealtimeLog.u8rtLogParam, NUM_CS_INDEX_DATA);
+		QUEUE_En_Cs_Queue(nPort, &pBuzzMsg);
+
+#ifdef DEBUG_MODE
+		printf("HTTP_MakeHttpPacketRtLog 이벤트 포트 : %d: 큐 크기 : %d\n\r", nPort, QUEUE_Cnt_Cs_Queue( nPort));
+		printf( "이벤트 큐 Result Card=%02X%02X%02X%02X, Pin=%c%c%c%c%c%c%c%c, DoorAuth_CardKind=%02X\r\n",
+			NewCardParam.stParam.CardId[0], NewCardParam.stParam.CardId[1], NewCardParam.stParam.CardId[2], NewCardParam.stParam.CardId[3],
+			NewCardParam.stParam.Pin[0], NewCardParam.stParam.Pin[1], NewCardParam.stParam.Pin[2], NewCardParam.stParam.Pin[3],
+			NewCardParam.stParam.Pin[4], NewCardParam.stParam.Pin[5], NewCardParam.stParam.Pin[6], NewCardParam.stParam.Pin[7],
+			NewCardParam.stParam.DoorAuth_CardKind);  //
+#endif
+	}
+
 	return;
 }
 
+void HTTP_TestHttpPacketRtLog(void)
+{
+/*
+	HTTP_MakeHttpPacketRtLog( 0, HTTP_EVENT_ACCESS_CODE, HTTP_VERIFYTYPE_CARD , Result_OK);
+	HTTP_MakeHttpPacketRtLog( 1, HTTP_EVENT_ACCESS_CODE, HTTP_VERIFYTYPE_CARD , Result_Wrong_Zone);
+	HTTP_MakeHttpPacketRtLog( 2, HTTP_EVENT_ACCESS_CODE, HTTP_VERIFYTYPE_CARD , Card_No_Granted);
+	HTTP_MakeHttpPacketRtLog( 0, HTTP_EVENT_ACCESS_CODE, HTTP_VERIFYTYPE_CARD , Card_Not_Registerd);
+	HTTP_MakeHttpPacketRtLog( 1, HTTP_EVENT_LONG_OPEN_CODE, HTTP_VERIFYTYPE_EVENT , Result_OK);
+	HTTP_MakeHttpPacketRtLog( 2, HTTP_EVENT_EXIT_CODE, HTTP_VERIFYTYPE_EVENT , Result_OK);
+//	HTTP_MakeHttpPacketRtLog( 0, HTTP_EVENT_FIRE_CODE, HTTP_VERIFYTYPE_EVENT, Result_OK);
+	HTTP_MakeHttpPacketRtLog( 3, HTTP_EVENT_TAMPER_CODE, HTTP_VERIFYTYPE_TAMPER , Result_OK);
+//	HTTP_MakeHttpPacketRtLog( 0, HTTP_EVENT_FIRE_CODE, HTTP_VERIFYTYPE_EVENT, Result_OK);
+	HTTP_MakeHttpPacketRtLog( 0, HTTP_EVENT_ACCESS_CODE, HTTP_VERIFYTYPE_CARD , Result_OK);
+	HTTP_MakeHttpPacketRtLog( 1, HTTP_EVENT_ACCESS_CODE, HTTP_VERIFYTYPE_CARD , Result_Wrong_Zone);
+	HTTP_MakeHttpPacketRtLog( 2, HTTP_EVENT_ACCESS_CODE, HTTP_VERIFYTYPE_CARD , Card_No_Granted);
+	HTTP_MakeHttpPacketRtLog( 0, HTTP_EVENT_ACCESS_CODE, HTTP_VERIFYTYPE_CARD , Card_Not_Registerd);
+	HTTP_MakeHttpPacketRtLog( 1, HTTP_EVENT_LONG_OPEN_CODE, HTTP_VERIFYTYPE_EVENT , Result_OK);
+	HTTP_MakeHttpPacketRtLog( 2, HTTP_EVENT_EXIT_CODE, HTTP_VERIFYTYPE_EVENT , Result_OK);
+//	HTTP_MakeHttpPacketRtLog( 0, HTTP_EVENT_FIRE_CODE, HTTP_VERIFYTYPE_EVENT, Result_OK);
+	HTTP_MakeHttpPacketRtLog( 3, HTTP_EVENT_TAMPER_CODE, HTTP_VERIFYTYPE_TAMPER , Result_OK);
+//	HTTP_MakeHttpPacketRtLog( 0, HTTP_EVENT_FIRE_CODE, HTTP_VERIFYTYPE_EVENT, Result_OK);
+*/
 
+}
 

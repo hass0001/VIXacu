@@ -1,0 +1,4 @@
+../User/Src/Version_Plus.c:23:6:VS_GetVersionStr	160	static
+../User/Src/Version_Plus.c:117:6:VS_GetVersionStrFromData	160	static
+../User/Src/Version_Plus.c:219:6:VS_GetVersionData	24	static
+../User/Src/Version_Plus.c:272:6:VS_CompareVersion	24	static

@@ -1,0 +1,4 @@
+../User/Src/vixDebugConsole.c:36:1:__io_getchar	16	static
+../User/Src/vixDebugConsole.c:45:1:__io_putchar	16	static
+../User/Src/vixDebugConsole.c:51:5:_write	24	static
+../User/Src/vixDebugConsole.c:69:6:OPEN_DebugConsole	4	static

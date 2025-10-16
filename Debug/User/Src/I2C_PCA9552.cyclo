@@ -1,0 +1,8 @@
+../User/Src/I2C_PCA9552.c:22:6:PCALED_Init	1
+../User/Src/I2C_PCA9552.c:28:6:PCALED_Reset	1
+../User/Src/I2C_PCA9552.c:36:6:PCALED_Set_LED	1
+../User/Src/I2C_PCA9552.c:43:6:PCALED_SetSensorLed	9
+../User/Src/I2C_PCA9552.c:123:6:PCALED_SetButtonLed	9
+../User/Src/I2C_PCA9552.c:203:6:PCALED_TIM2HandlerProc	9
+../User/Src/I2C_PCA9552.c:226:6:PCALED_485TxNoticeProc	8
+../User/Src/I2C_PCA9552.c:245:9:PCALED_Check_Timer5_Alive	2

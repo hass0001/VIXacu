@@ -31,7 +31,9 @@
 PCA9552_EXT void PCALED_Init(void);
 PCA9552_EXT void PCALED_Reset(void);
 PCA9552_EXT void PCALED_TIM2HandlerProc(void);
+PCA9552_EXT void PCALED_485TxNoticeProc(uint8_t nLedStep);
 PCA9552_EXT uint8_t PCALED_Check_Timer5_Alive(void);
 PCA9552_EXT void PCALED_SetSensorLed(uint8_t nSensor, uint8_t nOn);
+PCA9552_EXT void PCALED_SetButtonLed(uint8_t nButton, uint8_t nOn);
 
 #endif

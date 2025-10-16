@@ -34,7 +34,7 @@
 #include "vixEEPROM.h"
 #include "vixSpiDriver.h"
 #include "vixExNorFlash.h"
-//#include "vixRS485Reader.h"
+#include "CS74x_Queue.h"
 #include "vixUartQueue.h"
 #include "vixInput.h"
 #include "vixOutput.h"

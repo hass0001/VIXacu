@@ -19,7 +19,8 @@ extern IWDG_HandleTypeDef hiwdg;
 const uint16_t conJulianDateArray[13] = {0, 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};//365
                                 //      31,+28,+31, +30, +31, +30, +31, +31, +30, +31, +30,  +31  // ���� �ϼ�..
 
-void SPI2_sFlash_Init( void ){
+void SPI2_sFlash_Init( void )
+{
 //   OS_CREATERSEMA(&FlashExtSem);
 }
 
@@ -41,257 +42,188 @@ uint16_t gnCountPin;
 5: 특별카드 - 지정카드. 특별카드 timecode에 지정된 시간도 출입이 가능 (마스터카드를 제외하고 나머지는 그 시간에 출입 못함)
 */
 
-uint16_t CheckMpCardDataInFlash( uint8_t *cardData)
-{	//기본 address형 mobile card data에서 찾기.. 카드 index값과 함께 return..
-	uint16_t  u16ReturnValue;
-	uint16_t  u16SavedJulianDate, u16CurrentJulianDate; //MMDDYY
-
-	u16CardAddress  = cardData[0]*0x100 + cardData[1];//주소를 계산하기 위해서..시리얼 번호. cardData[2,3]은 회사 번호로 바뀌지 않음
-	sFlash4kAddr = FLASH_MpCardData_Start + (u16CardAddress * SIZE_OF_MPCARD_MSLOT);
-	//#define	FLASH_MpCardData_Start		0x00092000L
-	// 해당 어드레스 슬롯의 데이터만 가지고 판단 하므로 슬롯 길이 만큼만 읽는디.
-	xREAD_DataFromExNorFlash( sFlash4kAddr, sFlashBuffer, SIZE_OF_MPCARD_MSLOT);       //SIZE_OF_MPCARD_MSLOT 512
-
-	uint8_t nItem =  sFlashBuffer[NUM_OF_MPCARD_DATA_PER_MSLOT * SIZE_OF_MPCARD_DATA];	// 0x200+(31*16))
-
-	for(uint8_t i = 0; i < nItem; i++)   //   0~31
-	{		//10
-		if( memcmp( sFlashBuffer+(i*SIZE_OF_MPCARD_DATA), cardData+2, 6) == 0)
-		{	//있으면..
-			return u16ReturnValue = Card_Registerd_OK;	//	Card_No_Granted    1
-		}
-	}
- /* //기본 저장공간에 없으면 추가공간에서 확인
-  for(uint16_t i = 0; i < NUM_OF_DIR_MPCARD_SECTOR; i++)
-  { // 2048
-	  sFlash4kAddr = FLASH_MpCardData_Direct_Start + (i*SIZE_OF_DIR_MPCARD);  //
-	  xREAD_DataFromExNorFlash( sFlash4kAddr, sFlashBuffer, SIZE_OF_DIR_MPCARD );  // 섹터 데이터 읽음
-
-	  for(uint16_t j = 0; j < NUM_OF_DIR_MPCARD_PER_SECTOR; j++)
-	  { // 256
-		  if( memcmp( (sFlashBuffer+(j*SIZE_OF_BYTE_MPCARD),  cardData, 8) == 0)
-		  { //종류 : 상시ID(1), 일시ID(2), 당일카드ID(3)
-			  memcpy( sRegMpPin,  &sFlashBuffer[j*SIZE_OF_BYTE_MPCARD+8], 8);	// 찾은 Pin 번호 저장
-		      memcpy( sRegMpPass, &sFlashBuffer[j*SIZE_OF_BYTE_MPCARD+16], 2);	// 찾은 Pin의 비번 저장
-		      sRegLocation = 2;
-			  return u16ReturnValue = Card_Registerd_OK;//Card_Registerd_OK    0
-		  }
-	  }
-  }*/
-  return Card_Not_Registerd;  //#define Card_Not_Registerd    3
-}
-
-uint16_t CheckRfCardDataInFlash( uint8_t *cardData)
+uint16_t CheckRfCardDataInFlash( uint8_t *cardData, uint8_t bRW)
 {	//기본 address형 rf card data에서 찾기.. 카드 index값과 함께 return..
 	uint16_t  u16ReturnValue;
 	uint16_t  u16SavedJulianDate, u16CurrentJulianDate; //MMDDYY
 
-	memcpy( CardParameter.stParam.CardId,  cardData, 4);	// 찾은 카드번호 저장 에서 미등록 번호도 펴시하기 위해 전부 저장
-
-	u16CardAddress  = cardData[0]*0x100 + cardData[1];//주소를 계산하기 위해서..시리얼 번호. cardData[2,3]은 회사 번호로 바뀌지 않음
-	sFlash4kAddr = FLASH_RfCardData_Start + (u16CardAddress * SIZE_OF_RFCARD_RSLOT);
-	//#define	FLASH_MpCardData_Start		0x02092000L
-	// 해당 어드레스 슬롯의 데이터만 가지고 판단 하므로 슬롯 길이 만큼만 읽는디.
-	xREAD_DataFromExNorFlash( sFlash4kAddr, sFlashBuffer, SIZE_OF_RFCARD_RSLOT);       //SIZE_OF_RFCARD_RSLOT 256
-
-	uint8_t nItem =  sFlashBuffer[NUM_OF_RFCARD_DATA_PER_RSLOT * SIZE_OF_RFCARD_DATA];	// 0x200+(31*16))
-
-#ifdef DEBUG_MODE
-	printf( "CheckRfCardDataInFlash u16CardAddress=%04X, sFlash4kAddr=%08X,nItem=%02X\r\n",
-			u16CardAddress,			sFlash4kAddr,			nItem);
-#endif
-	if( (nItem == 0x0) || (nItem == 0xFF) )	// first time to write
+#ifdef KTWEST_WIEGAND
+	if( (cardData[2] == 0x00) || ( CheckDefaultCard(cardData) == true))  // 모바일 카드 번호 예) 00 92 34 3A  -> 34 3A 00 92
 	{
-		return Card_Not_Registerd;
+		memcpy( NewCardParam.stParam.CardId, cardData, 4);	// 찾은 카드번호 저장 에서 미등록 번호도 표시하기 위해 전부 저장
+		u16SavedJulianDate = (cardData[3] * 0x10000) + (cardData[0] * 0x100) + cardData[1];
+		sprintf( NewCardParam.stParam.Pin, "%8d", u16SavedJulianDate);	// 찾은 Pin 번호 저장
+		NewCardParam.stParam.DoorAuth_CardKind = 0xF4;	// All door 1111 권한 || 1:상시 ID.  2:일시 ID.  3:당일카드 ID. 4: 모바일 카드
+		NewCardParam.stParam.PassCode[0] = 0x99; // 사용기한 자리에 지정카드용 ACU 번호가 두개 들어감
+		NewCardParam.stParam.PassCode[1] = 0x31; // 사용기한 자리에 지정카드용 ACU 번호가 두개 들어감
+		NewCardParam.stParam.Location = 2;	// 임의 영역
+
+		u16ReturnValue = (NewCardParam.stParam.DoorAuth_CardKind << 8); //문이 4개인 TA4 는 출입권한인 앞쪽 4개만 잘라서 16비트중 앞쪽 8비트에 배정 //Door Auth(4) 0000
+																		//카드타입이 있는 뒤쪽 4비트만 왼쉬프스4 하고 결과값과 합쳐 리턴 antiPass(1), cardType(3) resultvalue(4)
+	#ifdef DEBUG_MODE
+		printf( "Exist 모바일 카드 u16ReturnValue=%04X\r\n",u16ReturnValue);
+	#endif
+		return u16ReturnValue += Card_Registerd_OK;//Card_Registerd_OK    0
 	}
-	else if( nItem <= NUM_OF_RFCARD_DATA_PER_RSLOT )  //   15면 가득 찼슴
-	{	// 슬롯이 비어 있슴
-		for(uint8_t i = 0; i < nItem; i++)		//  	1~15
-		{		//10
-			if( (sFlashBuffer[i*SIZE_OF_RFCARD_DATA+0] == cardData[2]) && (sFlashBuffer[i*SIZE_OF_RFCARD_DATA+1] == cardData[3]) )
-			{	//있으면..
-//				memcpy( CardParameter.stParam.CardId,  cardData, 4);	// 찾은 카드번호 저장 에서 미등록 번호도 펴시하기 위해 전부 저장
-				memcpy( CardParameter.stParam.Pin,  &sFlashBuffer[i*SIZE_OF_RFCARD_DATA+2], 8);	// 찾은 Pin 번호 저장
-				memcpy( CardParameter.stParam.PassCode, &sFlashBuffer[i*SIZE_OF_RFCARD_DATA+11], 2);	// 찾은 Pin의 비번 저장
-				CardParameter.stParam.Location = 1;
-				CardParameter.stParam.DoorAuth_CardKind = sFlashBuffer[i*SIZE_OF_RFCARD_DATA+10];
-
-				u16ReturnValue = ((sFlashBuffer[i*SIZE_OF_RFCARD_DATA+10] & 0xF0) * 0x100) +      // 문이 4개인 TA4 는 출입권한인 앞쪽 4개만 잘라서 16비트중 앞쪽 8비트에 배정 //Door Auth(4) 0000
-						  	  	 ((sFlashBuffer[i*SIZE_OF_RFCARD_DATA+10] & 0x0F) << 4);          // 카드타입이 있는 뒤쪽 4비트만 왼쉬프스4 하고 결과값과 합쳐 리턴 antiPass(1), cardType(3) resultvalue(4)
-#ifdef DEBUG_MODE
-				printf( "Exist  u16ReturnValue=%04X(%02X번째)\r\n",u16ReturnValue, i);
+	else   // 일반 카드 번호 예) 20 92 12 7C
 #endif
-				if( ( (sFlashBuffer[i*SIZE_OF_RFCARD_DATA+10]&0x07) == 0x02) ||
-				    ( (sFlashBuffer[i*SIZE_OF_RFCARD_DATA+10]&0x07) == 0x03) )
-				{ // 단기(임시)카드 또는 당일카드일 경우 출입기간을 체크함..
+#ifdef GUUI_PULLMAN_485
+	if( (CheckDefaultCard(cardData) == true) ) // 모바일 카드 번호 예) 00 92 34 3A  -> 34 3A 00 92
+	{
+		memcpy( NewCardParam.stParam.CardId, cardData, 4);	// 찾은 카드번호 저장 에서 미등록 번호도 표시하기 위해 전부 저장
+		u16SavedJulianDate = (cardData[3] * 0x10000) + (cardData[0] * 0x100) + cardData[1];
+		sprintf( NewCardParam.stParam.Pin, "%8d", u16SavedJulianDate);	// 찾은 Pin 번호 저장
+		NewCardParam.stParam.DoorAuth_CardKind = 0xF4;	// All door 1111 권한 || 1:상시 ID.  2:일시 ID.  3:당일카드 ID. 4: 모바일 카드
+		NewCardParam.stParam.PassCode[0] = 0x99; // 사용기한 자리에 지정카드용 ACU 번호가 두개 들어감
+		NewCardParam.stParam.PassCode[1] = 0x31; // 사용기한 자리에 지정카드용 ACU 번호가 두개 들어감
+		NewCardParam.stParam.Location = 2;	// 임의 영역
 
-					u16SavedJulianDate = sFlashBuffer[i*SIZE_OF_RFCARD_DATA+11]*0x100 +
-							             sFlashBuffer[i*SIZE_OF_RFCARD_DATA+12];
-					// const uint16_t conJulianDateArray[13] = {0, 1:0, 2:31, 3:59, 4:90, 5:120, 6:151, 7:181, 8:212, 9:243, 10:273, 11:304, 12:334};//365
-					u16CurrentJulianDate = toDayTime.YEAR+(conJulianDateArray[toDayTime.MON] + toDayTime.DATE)*100; // 올해 julian date * 100 + YY
+		u16ReturnValue = (NewCardParam.stParam.DoorAuth_CardKind << 8); //문이 4개인 TA4 는 출입권한인 앞쪽 4개만 잘라서 16비트중 앞쪽 8비트에 배정 //Door Auth(4) 0000
+																		//카드타입이 있는 뒤쪽 4비트만 왼쉬프스4 하고 결과값과 합쳐 리턴 antiPass(1), cardType(3) resultvalue(4)
+	#ifdef DEBUG_MODE
+		printf( "Exist 모바일 카드 u16ReturnValue=%04X\r\n",u16ReturnValue);
+	#endif
+		return u16ReturnValue += Card_Registerd_OK;//Card_Registerd_OK    0
+	}
+	else   // 일반 카드 번호 예) 20 92 12 7C
+#endif
+	{
+		memcpy( NewCardParam.stParam.CardId,  cardData, 4);	// 찾은 카드번호 저장 에서 미등록 번호도 표시하기 위해 전부 저장
 
-					if((u16SavedJulianDate%100 <= u16CurrentJulianDate%100)&&(u16SavedJulianDate/100 < u16CurrentJulianDate/100))
-					{//저장된 시간보다 현재시간이 크면..
-						//            if(u16SavedJulianDate < u16CurrentJulianDate){//저장된 시간보다 현재시간이 크면..
-						return u16ReturnValue += Card_No_Granted;//Card_No_Granted    1
-						//  return (sFlashBuffer[i * SIZE_OF_BYTE_CARD_DATA + 10] & 0xF0) * 0x100 +      // 문이 4개인 TA4 는 출입권한인 앞쪽 4개만 잘라서 16비트중 앞쪽 8비트에 배정 //Door Auth(4) 0000
-						//        ((sFlashBuffer[i * SIZE_OF_BYTE_CARD_DATA + 10] & 0x0F) << 4) + Card_No_Granted;//Card_No_Granted    1 //카드타입이 있는 뒤쪽 4비트만 왼쉬프스4 하고 결과값과 합쳐 리턴 antiPass(1), cardType(3) resultvalue(4)
+		u16CardAddress  = cardData[0]*0x100 + cardData[1];//주소를 계산하기 위해서..시리얼 번호. cardData[2,3]은 회사 번호로 바뀌지 않음
+		sFlash4kAddr = FLASH_RfCardData_Start + (u16CardAddress * SIZE_OF_RFCARD_RSLOT);
+		//#define	FLASH_MpCardData_Start		0x02092000L
+		// 해당 어드레스 슬롯의 데이터만 가지고 판단 하므로 슬롯 길이 만큼만 읽는디.
+		xREAD_DataFromExNorFlash( sFlash4kAddr, sFlashBuffer, SIZE_OF_RFCARD_RSLOT);       //SIZE_OF_RFCARD_RSLOT 256
+
+		uint8_t nItem =  sFlashBuffer[NUM_OF_RFCARD_DATA_PER_RSLOT * SIZE_OF_RFCARD_DATA];	// 0x200+(31*16))
+
+#ifdef DEBUG_MODE
+		printf( "CheckRfCardDataInFlash u16CardAddress=%04X, sFlash4kAddr=%08X,nItem=%02X\r\n",
+			u16CardAddress, sFlash4kAddr, nItem);
+#endif
+		if( (nItem == 0x0) || (nItem > (NUM_OF_RFCARD_DATA_PER_RSLOT+1)) || (nItem == 0xFF))	// first time to write
+		{
+			return Card_Not_Registerd;
+		}
+		else if( nItem <= NUM_OF_RFCARD_DATA_PER_RSLOT )  //   15면 가득 찼슴
+		{	// 슬롯이 비어 있거나 가득참 슴
+			for(uint8_t i = 0; i < nItem; i++)		//  	1~15
+			{		//10
+				if( (sFlashBuffer[i*SIZE_OF_RFCARD_DATA+0] == cardData[2]) && (sFlashBuffer[i*SIZE_OF_RFCARD_DATA+1] == cardData[3]) )
+				{	//있으면..
+	//				memcpy( CardParameter.stParam.CardId,  cardData, 4);	// 찾은 카드번호 저장 에서 미등록 번호도 표시하기 위해 전부 저장
+					if(bRW == 1)
+						memcpy( NewCardParam.stParam.Pin,  &sFlashBuffer[(i*SIZE_OF_RFCARD_DATA)+2], 8);	// 찾은 Pin 번호 저장
+					NewCardParam.stParam.DoorAuth_CardKind = sFlashBuffer[i*SIZE_OF_RFCARD_DATA+10];
+					memcpy( NewCardParam.stParam.PassCode, &sFlashBuffer[i*SIZE_OF_RFCARD_DATA+11], 2);	// 찾은 Pin의 비번 저장
+					NewCardParam.stParam.Location = 1;
+
+					u16ReturnValue = ((sFlashBuffer[i*SIZE_OF_RFCARD_DATA+10] & 0xF0) * 0x100) +      // 문이 4개인 TA4 는 출입권한인 앞쪽 4개만 잘라서 16비트중 앞쪽 8비트에 배정 //Door Auth(4) 0000
+									 ((sFlashBuffer[i*SIZE_OF_RFCARD_DATA+10] & 0x0F) << 4);          // 카드타입이 있는 뒤쪽 4비트만 왼쉬프스4 하고 결과값과 합쳐 리턴 antiPass(1), cardType(3) resultvalue(4)
+	#ifdef DEBUG_MODE
+					printf( "Exist 순영역  u16ReturnValue=%04X(%02X번째)\r\n",u16ReturnValue, i);
+	#endif
+					if( ( (sFlashBuffer[i*SIZE_OF_RFCARD_DATA+10]&0x07) == 0x02) ||
+						( (sFlashBuffer[i*SIZE_OF_RFCARD_DATA+10]&0x07) == 0x03) )
+					{ // 단기(임시)카드 또는 당일카드일 경우 출입기간을 체크함..
+
+						u16SavedJulianDate = sFlashBuffer[i*SIZE_OF_RFCARD_DATA+11]*0x100 +
+											 sFlashBuffer[i*SIZE_OF_RFCARD_DATA+12];
+						// const uint16_t conJulianDateArray[13] = {0, 1:0, 2:31, 3:59, 4:90, 5:120, 6:151, 7:181, 8:212, 9:243, 10:273, 11:304, 12:334};//365
+						u16CurrentJulianDate = toDayTime.YEAR+(conJulianDateArray[toDayTime.MON] + toDayTime.DATE)*100; // 올해 julian date * 100 + YY
+
+						if((u16SavedJulianDate%100 <= u16CurrentJulianDate%100)&&(u16SavedJulianDate/100 < u16CurrentJulianDate/100))
+						{//저장된 시간보다 현재시간이 크면..
+							//            if(u16SavedJulianDate < u16CurrentJulianDate){//저장된 시간보다 현재시간이 크면..
+							return u16ReturnValue += Card_No_Granted;//Card_No_Granted    1
+							//  return (sFlashBuffer[i * SIZE_OF_BYTE_CARD_DATA + 10] & 0xF0) * 0x100 +      // 문이 4개인 TA4 는 출입권한인 앞쪽 4개만 잘라서 16비트중 앞쪽 8비트에 배정 //Door Auth(4) 0000
+							//        ((sFlashBuffer[i * SIZE_OF_BYTE_CARD_DATA + 10] & 0x0F) << 4) + Card_No_Granted;//Card_No_Granted    1 //카드타입이 있는 뒤쪽 4비트만 왼쉬프스4 하고 결과값과 합쳐 리턴 antiPass(1), cardType(3) resultvalue(4)
+						}
+					}
+					return u16ReturnValue += Card_Registerd_OK;//Card_Registerd_OK    0
+				}
+			}
+		}
+		else	// numItem == 16  은 확장 영역에 있다는 뜻
+		{
+	#ifdef DEBUG_MODE
+			printf( "Card_Not_Registerd 순영역에 없음 u16ReturnValue=%04X\r\n",u16ReturnValue);
+	#endif
+
+			// 없으면 기본 저장공간에 없으면 추가공간에서 확인
+			for(uint16_t i = 0; i < NUM_OF_DIR_RFCARD_SECTOR; i++)
+			{ // 1024
+				sFlash4kAddr = FLASH_RfCardData_Direct_Start + (i*SIZE_OF_DIR_RFCARD_SLOT);  //
+				xREAD_DataFromExNorFlash( sFlash4kAddr, sFlashBuffer, SIZE_OF_DIR_RFCARD_SLOT );  // 섹터 데이터 읽음
+
+				uint8_t nUid = sFlashBuffer[NUM_OF_DIR_RFCARD_PER_SECTOR*SIZE_OF_DIR_RFCARD_DATA];
+				if( (nUid == 0x0)|| (nUid == 0xFF))	// first time to write
+				{
+					break;
+				}
+				else if( nUid <= NUM_OF_DIR_RFCARD_PER_SECTOR )  //   227면 가득 찼슴
+				{	// 슬롯이 비어 있슴
+					for(uint8_t j = 0; j < nUid; j++)
+					{ // 227
+					  if( memcmp( sFlashBuffer+(j*SIZE_OF_DIR_RFCARD_DATA),  cardData, 4) == 0)
+					  { //종류 : 상시ID(1), 일시ID(2), 당일카드ID(3)
+							if(bRW == 1)  // 일기 때는 메모리에서 얻는다
+								memcpy( NewCardParam.stParam.Pin,      &sFlashBuffer[j*SIZE_OF_DIR_RFCARD_DATA+4], 8);	// 찾은 Pin 번호 저장
+							memcpy( NewCardParam.stParam.PassCode, &sFlashBuffer[j*SIZE_OF_DIR_RFCARD_DATA+13], 2);	// 찾은 Pin의 비번 저장
+							NewCardParam.stParam.Location = 2;
+							NewCardParam.stParam.DoorAuth_CardKind = sFlashBuffer[i*SIZE_OF_RFCARD_DATA+12];
+
+							u16ReturnValue = ((sFlashBuffer[j * SIZE_OF_DIR_RFCARD_DATA + 12] & 0xF0) * 0x100) +      // 문이 4개인 TA4 는 출입권한인 앞쪽 4개만 잘라서 16비트중 앞쪽 8비트에 배정 //Door Auth(4) 0000
+										     ((sFlashBuffer[j * SIZE_OF_DIR_RFCARD_DATA + 12] & 0x0F) << 4);          // 카드타입이 있는 뒤쪽 4비트만 왼쉬프스4 하고 결과값과 합쳐 리턴 antiPass(1), cardType(3) resultvalue(4)
+					#ifdef DEBUG_MODE
+							printf( "Exist Extended u16ReturnValue=%04X\r\n",u16ReturnValue);
+					#endif
+						  if(((sFlashBuffer[j*SIZE_OF_DIR_RFCARD_DATA+12]&0x07) == 0x02)||
+							 ((sFlashBuffer[j*SIZE_OF_DIR_RFCARD_DATA+12]&0x07) == 0x03))
+						  { //종류 : 상시ID(1), 일시ID(2), 당일카드ID(3)
+							  uint16_t u16SavedJulianDate, u16CurrentJulianDate; //MMDDYY
+							  u16SavedJulianDate = sFlashBuffer[j*SIZE_OF_DIR_RFCARD_DATA+13]*0x100 +
+												   sFlashBuffer[j*SIZE_OF_DIR_RFCARD_DATA+14];
+							  u16CurrentJulianDate = toDayTime.YEAR+(conJulianDateArray[toDayTime.MON] + toDayTime.DATE)*100; // 올해 julian date * 100 + YY
+							  if(u16SavedJulianDate < u16CurrentJulianDate)
+							  {//저장된 시간보다 현재시간이 크면..
+								  return u16ReturnValue += Card_No_Granted;//Card_No_Granted    1
+					//            return (sFlashBuffer[i*SIZE_OF_BYTE_CARD_DATA+3] & 0xF0) * 0x100 +      // 문이 4개인 TA4 는 출입권한인 앞쪽 4개만 잘라서 16비트중 앞쪽 8비트에 배정 //Door Auth(4) 0000
+					//                  ((sFlashBuffer[i*SIZE_OF_BYTE_CARD_DATA+3] & 0x0F) << 4) + Card_No_Granted;   //Card_No_Granted    1  //카드타입이 있는 뒤쪽 4비트만 왼쉬프스4 하고 결과값과 합쳐 리턴 antiPass(1), cardType(3) resultvalue(4)
+							  }
+						  }
+						  return u16ReturnValue += Card_Registerd_OK;//Card_Registerd_OK    0
+					//      return (sFlashBuffer[i*SIZE_OF_BYTE_CARD_DATA+3] & 0xF0) * 0x100 +      //앞쪽 4개만 유효하므로.. TA4
+					//             ((sFlashBuffer[i*SIZE_OF_BYTE_CARD_DATA+3] & 0x0F) << 4) + Card_Registerd_OK;//Card_Registerd_OK    0
+					  }
+					  else
+					  {
+				#ifdef DEBUG_MODE
+						printf( "Card_Not_Registerd in this Extened Area u16ReturnValue=%04X\r\n",u16ReturnValue);
+				#endif
+					  }
 					}
 				}
-				return u16ReturnValue += Card_Registerd_OK;//Card_Registerd_OK    0
+				else
+				{
+					break;
+				#ifdef DEBUG_MODE
+						printf( "Card_Not_Registerd in sector Extened Area u16ReturnValue=%04X\r\n",u16ReturnValue);
+				#endif
+				}
 			}
 		}
 	}
-	else	// numItem => 15 ~ 255
-	{
+
 #ifdef DEBUG_MODE
-		printf( "Card_Not_Registerd  u16ReturnValue=%04X\r\n",u16ReturnValue);
+	printf( "CheckRfCardDataInFlash Card_Not_Registerd Card=%02X%02X%02X%02X,Pin=%02X%02X%02X%02X%02X%02X%02X%02X,DoorAuth_CardKind=%02X\r\n",
+			NewCardParam.stParam.CardId[0], NewCardParam.stParam.CardId[1], NewCardParam.stParam.CardId[2], NewCardParam.stParam.CardId[3],
+			NewCardParam.stParam.Pin[0], NewCardParam.stParam.Pin[1], NewCardParam.stParam.Pin[2], NewCardParam.stParam.Pin[3],
+			NewCardParam.stParam.Pin[4], NewCardParam.stParam.Pin[5], NewCardParam.stParam.Pin[6], NewCardParam.stParam.Pin[7],
+			NewCardParam.stParam.DoorAuth_CardKind);  //
 #endif
-		return Card_Not_Registerd;
-	}
-  // 없으면 기본 저장공간에 없으면 추가공간에서 확인
-  for(uint16_t i = 0; i < NUM_OF_DIR_RFCARD_SECTOR; i++)
-  { // 1024
-	  sFlash4kAddr = FLASH_RfCardData_Direct_Start + (i*SIZE_OF_DIR_RFCARD_SLOT);  //
-	  xREAD_DataFromExNorFlash( sFlash4kAddr, sFlashBuffer, SIZE_OF_DIR_RFCARD_SLOT );  // 섹터 데이터 읽음
-
-	  uint16_t nUid = sFlashBuffer[NUM_OF_DIR_RFCARD_PER_SECTOR*SIZE_OF_DIR_RFCARD_DATA];
-	  for(uint16_t j = 0; j < nUid; j++)
-	  { // 227
-		  if( memcmp( sFlashBuffer+(j*SIZE_OF_DIR_RFCARD_DATA),  cardData, 4) == 0)
-		  { //종류 : 상시ID(1), 일시ID(2), 당일카드ID(3)
-				memcpy( CardParameter.stParam.Pin,      &sFlashBuffer[j*SIZE_OF_DIR_RFCARD_DATA+4], 8);	// 찾은 Pin 번호 저장
-				memcpy( CardParameter.stParam.PassCode, &sFlashBuffer[j*SIZE_OF_DIR_RFCARD_DATA+13], 2);	// 찾은 Pin의 비번 저장
-				CardParameter.stParam.Location = 2;
-				CardParameter.stParam.DoorAuth_CardKind = sFlashBuffer[i*SIZE_OF_RFCARD_DATA+12];
-
-				u16ReturnValue = ((sFlashBuffer[j * SIZE_OF_DIR_RFCARD_DATA + 12] & 0xF0) * 0x100) +      // 문이 4개인 TA4 는 출입권한인 앞쪽 4개만 잘라서 16비트중 앞쪽 8비트에 배정 //Door Auth(4) 0000
-		                       ((sFlashBuffer[j * SIZE_OF_DIR_RFCARD_DATA + 12] & 0x0F) << 4);          // 카드타입이 있는 뒤쪽 4비트만 왼쉬프스4 하고 결과값과 합쳐 리턴 antiPass(1), cardType(3) resultvalue(4)
-#ifdef DEBUG_MODE
-				printf( "Exist Extended u16ReturnValue=%04X\r\n",u16ReturnValue);
-#endif
-		      if(((sFlashBuffer[j*SIZE_OF_DIR_RFCARD_DATA+12]&0x07) == 0x02)||
-		         ((sFlashBuffer[j*SIZE_OF_DIR_RFCARD_DATA+12]&0x07) == 0x03))
-		      { //종류 : 상시ID(1), 일시ID(2), 당일카드ID(3)
-		          uint16_t u16SavedJulianDate, u16CurrentJulianDate; //MMDDYY
-		          u16SavedJulianDate = sFlashBuffer[j*SIZE_OF_DIR_RFCARD_DATA+13]*0x100 +
-		        		               sFlashBuffer[j*SIZE_OF_DIR_RFCARD_DATA+14];
-		          u16CurrentJulianDate = toDayTime.YEAR+(conJulianDateArray[toDayTime.MON] + toDayTime.DATE)*100; // 올해 julian date * 100 + YY
-		          if(u16SavedJulianDate < u16CurrentJulianDate)
-		          {//저장된 시간보다 현재시간이 크면..
-		        	  return u16ReturnValue += Card_No_Granted;//Card_No_Granted    1
-		//            return (sFlashBuffer[i*SIZE_OF_BYTE_CARD_DATA+3] & 0xF0) * 0x100 +      // 문이 4개인 TA4 는 출입권한인 앞쪽 4개만 잘라서 16비트중 앞쪽 8비트에 배정 //Door Auth(4) 0000
-		//                  ((sFlashBuffer[i*SIZE_OF_BYTE_CARD_DATA+3] & 0x0F) << 4) + Card_No_Granted;   //Card_No_Granted    1  //카드타입이 있는 뒤쪽 4비트만 왼쉬프스4 하고 결과값과 합쳐 리턴 antiPass(1), cardType(3) resultvalue(4)
-		          }
-		      }
-		      return u16ReturnValue += Card_Registerd_OK;//Card_Registerd_OK    0
-		//      return (sFlashBuffer[i*SIZE_OF_BYTE_CARD_DATA+3] & 0xF0) * 0x100 +      //앞쪽 4개만 유효하므로.. TA4
-		//             ((sFlashBuffer[i*SIZE_OF_BYTE_CARD_DATA+3] & 0x0F) << 4) + Card_Registerd_OK;//Card_Registerd_OK    0
-		  }
-		  else
-		  {
-#ifdef DEBUG_MODE
-				printf( "Card_Not_Registerd Extened Area u16ReturnValue=%04X\r\n",u16ReturnValue);
-#endif
-		  }
-	  }
-  }
-#ifdef DEBUG_MODE
-	printf( "CheckRfCardDataInFlash Result Card%02X%02X%02X%002X,Pin%02X%02X%02X%02X%02X%02X%02X%02X,DoorAuth_CardKind=%02X\r\n",
-		CardParameter.stParam.CardId[0], CardParameter.stParam.CardId[1], CardParameter.stParam.CardId[2], CardParameter.stParam.CardId[3],
-		CardParameter.stParam.Pin[0], CardParameter.stParam.Pin[1],CardParameter.stParam.Pin[2],CardParameter.stParam.Pin[3],
-		CardParameter.stParam.Pin[4],CardParameter.stParam.Pin[5],CardParameter.stParam.Pin[6],CardParameter.stParam.Pin[7],
-		CardParameter.stParam.DoorAuth_CardKind);  //
-#endif
-  return Card_Not_Registerd;  //#define Card_Not_Registerd    3
-}
-
-
-uint8_t WriteMpCardDataToSerialFlash( uint8_t *stCardData)
-{   //address형 card data 쓰기..
-	uint16_t ulFor, lastbufIndex, rdbufIndex;
-	uint8_t numItem = 0, setItem;
-	uint8_t nReturn = 0;
-	uint16_t rdSectorIndex;
-	uint32_t rdSectorAddr;
-	uint32_t bitRegOrNot;
-	uint32_t wrSectorAddr;
-
-	u16CardAddress  = stCardData[0]*0x100 + stCardData[1];//(*(stCardData+0))*0x100+(*(stCardData+1));
-	sFlash4kAddr = FLASH_MpCardData_Start + (u16CardAddress * SIZE_OF_MPCARD_MSLOT);
-	rdSectorAddr =  sFlash4kAddr & 0xFFFFF000;	//
-	rdSectorIndex = sFlash4kAddr & 0x00000FFF;	// 0xN00
-	xREAD_DataFromExNorFlash( rdSectorAddr, sFlashBuffer, 0x1000);       //  Read 4K (==1Sector) old data
-
-	//  sFlashBuffer // 마지막 정보를 읽고 데이터 처리
-	lastbufIndex = rdSectorIndex + ( NUM_OF_MPCARD_DATA_PER_MSLOT * SIZE_OF_MPCARD_DATA );	// 0x200+(31*16))
-	numItem = sFlashBuffer[lastbufIndex+0];  //  last information buffer[0]
-	if((numItem == 0x0) || (numItem == 0xFF))	// first time to write
-	{
-		setItem = 0;
-		sFlashBuffer[lastbufIndex+0] = 0;
-		nReturn = Card_Registerd_OK;
-	}
-	else if( numItem < NUM_OF_MPCARD_DATA_PER_MSLOT )  //   31 => 가득 찼슴
-	{	// 슬롯이 비어 있슴
-		setItem = numItem;
-		nReturn = Card_Registerd_OK;
-	}
-	else	// numItem => 32 ~ 255
-	{
-		nReturn = Card_No_Space;
-	}
-
-	if( nReturn == Card_Registerd_OK)   // 버퍼에 쓰기 완료한 데이터를 플래쉬 섹터에 저장
-	{
-		rdbufIndex = rdSectorIndex + (setItem*SIZE_OF_MPCARD_DATA);
-		memcpy( sFlashBuffer+rdbufIndex+0, stCardData+2, 16);
-
-		sFlashBuffer[lastbufIndex+0] += 1;
-		WriteSFlash4kSectorData(rdSectorAddr, sFlashBuffer);
-		return nReturn;
-	}
-	else
-	{	// 	어드레스 모드에서 저장 안 되니 확장 모드에서 저장하도록 시도. 저장되어 있지도, 자리가 없어 새로 등록도 안되면.. 추가공간에..
-		for(uint16_t i = 0; i < NUM_OF_DIR_MPCARD_SECTOR; i++)   //	2048
-		{
-			sFlash4kAddr = FLASH_MpCardData_Direct_Start + (i * 0x1000);
-			rdSectorAddr = sFlash4kAddr;
-			xREAD_DataFromExNorFlash( rdSectorAddr, sFlashBuffer, 0x1000);  //  Read 4K (==1Sector) old data
-
-			//  sFlashBuffer // 마지막 정보를 읽고 데이터 처리
-			numItem = sFlashBuffer[IDX_OF_DIR_MPCARD_COUNT];  //  last information buffer[0]
-			if( (numItem == 0x0) || (numItem == 0xFF))
-			{	// 처음 저장 인것
-				setItem = 0;
-				sFlashBuffer[IDX_OF_DIR_MPCARD_COUNT] = 0;
-				nReturn = Card_Registerd_OK;
-				break;
-			}
-			else if( numItem < NUM_OF_DIR_MPCARD_PER_SECTOR) //	227
-			{
-				setItem = numItem;
-				nReturn = Card_Registerd_OK;
-				break;
-			}
-			else
-			{ 	// 갯 수 넘어감. 공간 없슴
-				nReturn = Card_No_Space;
-				continue;
-			}
-		}
-
-		if( nReturn == Card_Registerd_OK)   // 버퍼에 쓰기 완료한 데이터를 플래쉬 섹터에 저장
-		{
-			rdbufIndex = (setItem*SIZE_OF_DIR_MPCARD_DATA);
-			memcpy( sFlashBuffer+rdbufIndex+0, stCardData, 18);
-			sFlashBuffer[IDX_OF_DIR_MPCARD_COUNT] += 1;
-
-			WriteSFlash4kSectorData(rdSectorAddr, sFlashBuffer);
-			return nReturn;
-		}
-	}
-	return Card_No_Space;//추가공간에도 넣을 공간이 없으면..
+	return Card_Not_Registerd;  //#define Card_Not_Registerd    3
 }
 
 uint8_t ClearRfCardIndexOnSerialFlash( void )
@@ -322,45 +254,56 @@ uint8_t ClearRfCardIndexOnSerialFlash( void )
 	}
 
 	// 다이렉트 섹터 데이터 크리어 -> 기본 저장공간에 지우고 추가공간에서 확인
-	  for(uint16_t i = 0; i < NUM_OF_DIR_RFCARD_SECTOR; i++)
-	  { // 1024
-		  sFlash4kAddr = FLASH_RfCardData_Direct_Start + (i*SIZE_OF_DIR_RFCARD_SLOT);  //
-		  xREAD_DataFromExNorFlash( sFlash4kAddr, sFlashBuffer, SIZE_OF_DIR_RFCARD_SLOT );  // 섹터 데이터 읽음
+	for(uint16_t i = 0; i < NUM_OF_DIR_RFCARD_SECTOR; i++)
+	{ // 1024
+		sFlash4kAddr = FLASH_RfCardData_Direct_Start + (i*SIZE_OF_DIR_RFCARD_SLOT);  //
+		xREAD_DataFromExNorFlash( sFlash4kAddr, sFlashBuffer, SIZE_OF_DIR_RFCARD_SLOT );  // 섹터 데이터 읽음
 
-		  sFlashBuffer[NUM_OF_DIR_RFCARD_PER_SECTOR*SIZE_OF_DIR_RFCARD_DATA] = 0;
-		  WriteSFlash4kSectorData(sFlash4kAddr, sFlashBuffer);
-	  }
+		sFlashBuffer[NUM_OF_DIR_RFCARD_PER_SECTOR*SIZE_OF_DIR_RFCARD_DATA] = 0;
+		WriteSFlash4kSectorData(sFlash4kAddr, sFlashBuffer);
+	}
 
 	return 1;//추가공간에도 넣을 공간이 없으면..
 }
 
 uint8_t WriteRfCardDataToSerialFlash( uint8_t *stCardData)
 {   //address형 card data 쓰기..
-	static uint8_t sameCard = 0;
-	if( CheckRfCardDataInFlash(stCardData) == Card_Not_Registerd)
+
+#ifdef LOG_DEBUG
+	printf( "WriteRfCardDataToSerialFlash Card%02X%02X%02X%002X,Pin%02X%02X%02X%02X%02X%02X%02X%02X\r\n",
+			stCardData[0], stCardData[1], stCardData[2], stCardData[3],
+			stCardData[4], stCardData[5], stCardData[6], stCardData[7],
+			stCardData[8], stCardData[9], stCardData[10], stCardData[11]);
+#endif
+	memcpy( NewCardParam.stParam.Pin, &stCardData[4], 8);
+//	static uint8_t sameCard = 0;
+	if( CheckRfCardDataInFlash(stCardData, 0) == Card_Not_Registerd)  // NewCardParam 에 설정함
 	{
-		NewWriteRfCardDataToSerialFlash(stCardData);
-		sameCard = 0;
+		memcpy( NewCardParam.u8strParam, stCardData, 16);
+		return NewWriteRfCardDataToSerialFlash(NewCardParam.u8strParam);
+	//	sameCard = 0;
 	}
 	else   /// 이미 등록 되어 있슴
 	{
-		if( sameCard >= 3)  // 같은 데이터가 0(두번째), 1(세번째), 2(네번째), 3(다섰번 째는 수정되었으므로 오버라이트)
+//		if( sameCard >= 3)  // 같은 데이터가 0(두번째), 1(세번째), 2(네번째), 3(다섰번 째는 수정되었으므로 오버라이트)
 		{
-			OverWriteRfCardDataToSerialFlash(stCardData);
-			sameCard = 0;
+			NewCardParam.stParam.DoorAuth_CardKind |= (0x80 >> HttpcSubModeStep);
+			return OverWriteRfCardDataToSerialFlash(NewCardParam.u8strParam);
+	//		sameCard = 0;
 		}
-		else
-		{
-			sameCard++;
-		}
+//		else
+	//	{
+		//	sameCard++;
+//		}
 	}
+	return Card_Error_Registerd;
 }
 
 uint8_t OverWriteRfCardDataToSerialFlash( uint8_t *stCardData)
 {   //address형 card data 쓰기..
 	uint16_t ulFor, lastbufIndex, rdbufIndex;
 	uint8_t numItem = 0, setItem;
-	uint8_t nReturn = 0;
+	uint8_t nReturn = 0xFF;
 	uint16_t rdSectorIndex;
 	uint32_t rdSectorAddr;
 	uint32_t bitRegOrNot;
@@ -372,8 +315,13 @@ uint8_t OverWriteRfCardDataToSerialFlash( uint8_t *stCardData)
 	rdSectorIndex = sFlash4kAddr & 0x00000FFF;	// 0xN00
 
 #ifdef DEBUG_MODE
-	printf( "OverWriteRfCardDataToSerialFlash rdSectorAddr=%08X, rdSectorIndex=%08X\r\n",
+	printf( "OverWriteRfCardDataToSerialFlash rdSectorAddr=%08X, rdSectorIndex=%08X\r\n Data=",
 			rdSectorAddr,			rdSectorIndex);
+	for(uint8_t ni = 0; ni < 16; ni++)
+	{
+		printf("%02X ", stCardData[ni]);
+	}
+	printf("\r\n");
 #endif
 	xREAD_DataFromExNorFlash( rdSectorAddr, sFlashBuffer, 0x1000);
 	//  Read 4K (==1Sector) old data. 섹터로 읽어야 나중에 쓸때 섹터로 쓸 수 있다.
@@ -386,18 +334,18 @@ uint8_t OverWriteRfCardDataToSerialFlash( uint8_t *stCardData)
 	printf( "OverWriteRfCardDataToSerialFlash u16CardAddress=%04X, lastbufIndex=%04X,numItem=%02X\r\n",
 			u16CardAddress,			lastbufIndex,			numItem);
 #endif
-	if( (numItem == 0x0) || (numItem == 0xFF) )	// first time to write
+	if( (numItem == 0x0) || (numItem > (NUM_OF_RFCARD_DATA_PER_RSLOT+1)) || (numItem == 0xFF))	// first time to write
 	{
 		setItem = 0;
 		sFlashBuffer[lastbufIndex+0] = 0;
 		nReturn = Card_Registerd_OK;   /// Error -> 있다고 했는데 쓰인 적이 없는 경우
 	}
-	else if( numItem < NUM_OF_RFCARD_DATA_PER_RSLOT )  //   15면 가득 찼슴
+	else if( numItem <= NUM_OF_RFCARD_DATA_PER_RSLOT )  //   15면 가득 찼슴
 	{	// 슬롯이 비어 있슴
 		setItem = numItem;
 		nReturn = Card_Registerd_OK;
 	}
-	else	// numItem => 15 ~ 255
+	else	// numItem => 16
 	{
 		nReturn = Card_No_Space;  // 있다고 했는데 없으므로 확장 영역 쪽에서 찾음.
 	}
@@ -406,14 +354,13 @@ uint8_t OverWriteRfCardDataToSerialFlash( uint8_t *stCardData)
 #endif
 	if( nReturn == Card_Registerd_OK)   // 버퍼에 쓰기 완료한 데이터를 플래쉬 섹터에 저장
 	{
-
 		if( setItem == 0)
 		{ // 있다고 했는데 카운트가 0 이면 오류
 			rdbufIndex = rdSectorIndex ;  // 0xN00+(setItem*16))  ,, 0xN00+(0*16)
 			memcpy( sFlashBuffer+rdbufIndex+0, stCardData+2, 14);
 			sFlashBuffer[lastbufIndex+0] += 1;  //  있는 것을 덮어 썻으므로
 		}
-		else
+		else  // numItem <= NUM_OF_RFCARD_DATA_PER_RSLOT
 		{
 			for(uint8_t i = 0; i < setItem; i++)		//  	1~15
 			{		//10
@@ -457,7 +404,7 @@ uint8_t OverWriteRfCardDataToSerialFlash( uint8_t *stCardData)
 				if( memcmp( sFlashBuffer+(j*SIZE_OF_DIR_RFCARD_DATA),  stCardData, 4) == 0)  // 같은 데이터 찾음, 덮어쓰고 나가기
 				{ //종류 : 상시ID(1), 일시ID(2), 당일카드ID(3)
 
-					if( (numItem == 0x0) || (numItem == 0xFF) )
+					if( (numItem == 0x0) || (numItem > NUM_OF_DIR_RFCARD_PER_SECTOR) || (numItem == 0xFF) )
 					{	// 처음 저장 인것 setItem  있다고 했는데 처음인 것은 에러
 						setItem = 0;
 						rdbufIndex = (setItem*SIZE_OF_DIR_RFCARD_DATA);
@@ -466,12 +413,12 @@ uint8_t OverWriteRfCardDataToSerialFlash( uint8_t *stCardData)
 						nReturn = Card_Registerd_OK;
 						break;
 					}
-					else if( numItem < NUM_OF_DIR_RFCARD_PER_SECTOR) //	227
+					else if( numItem <= NUM_OF_DIR_RFCARD_PER_SECTOR) //	227
 					{
 						setItem = numItem;
 						rdbufIndex = (setItem*SIZE_OF_DIR_RFCARD_DATA);
 						memcpy( sFlashBuffer+rdbufIndex+0, stCardData, 16);
-			//		sFlashBuffer[IDX_OF_DIR_RFCARD_COUNT] = 1;  // ejvdjTmrldlmFH
+			//		sFlashBuffer[IDX_OF_DIR_RFCARD_COUNT];  // 원래 카드 카운트
 						nReturn = Card_Registerd_OK;
 						break;
 					}
@@ -507,7 +454,7 @@ uint8_t NewWriteRfCardDataToSerialFlash( uint8_t *stCardData)
 {   //address형 card data 쓰기..
 	uint16_t ulFor, lastbufIndex, rdbufIndex;
 	uint8_t numItem = 0, setItem;
-	uint8_t nReturn = 0;
+	uint8_t nReturn = 0xFF;
 	uint16_t rdSectorIndex;
 	uint32_t rdSectorAddr;
 	uint32_t bitRegOrNot;
@@ -533,10 +480,10 @@ uint8_t NewWriteRfCardDataToSerialFlash( uint8_t *stCardData)
 	printf( "NewWriteRfCardDataToSerialFlash u16CardAddress=%04X, sFlash4kAddr=%08X,nItem=%02X, lastbufIndex=%04X\r\n",
 			u16CardAddress,			sFlash4kAddr,			numItem, lastbufIndex);
 #endif
-	if( (numItem == 0x0) || (numItem == 0xFF) )	// first time to write
+	if( (numItem == 0x0) || (numItem > (NUM_OF_RFCARD_DATA_PER_RSLOT+1)) || (numItem == 0xFF))	// first time to write
 	{
 		setItem = 0;
-		sFlashBuffer[lastbufIndex+0] = 0;
+		sFlashBuffer[lastbufIndex+0] = 0;   // 증가 시킴
 		nReturn = Card_Registerd_OK;
 	}
 	else if( numItem < NUM_OF_RFCARD_DATA_PER_RSLOT )  //   15면 가득 찼슴
@@ -544,11 +491,12 @@ uint8_t NewWriteRfCardDataToSerialFlash( uint8_t *stCardData)
 		setItem = numItem;
 		nReturn = Card_Registerd_OK;
 	}
-	else	// numItem => 15 ~ 255
+	else	// numItem => 15 => NUM_OF_RFCARD_DATA_PER_RSLOT
 	{
 		nReturn = Card_No_Space;
 	}
 
+    //////////////////  확인된 위치에 데이터를 쓰거나 버림  ///////////////
 	if( nReturn == Card_Registerd_OK)   // 버퍼에 쓰기 완료한 데이터를 플래쉬 섹터에 저장
 	{
 		rdbufIndex = rdSectorIndex + (setItem*SIZE_OF_RFCARD_DATA);  // 0xN00+(setItem*16))
@@ -568,8 +516,16 @@ uint8_t NewWriteRfCardDataToSerialFlash( uint8_t *stCardData)
 		WriteSFlash4kSectorData(rdSectorAddr, sFlashBuffer);
 		return nReturn;
 	}
-	else
+	else  // make count 16
 	{	// 	어드레스 모드에서 저장 안 되니 확장 모드에서 저장하도록 시도. 저장되어 있지도, 자리가 없어 새로 등록도 안되면.. 추가공간에..
+		sFlashBuffer[lastbufIndex+0] = 16;
+#ifdef DEBUG_MODE
+		printf( "NewWriteRfCardDataToSerialFlash rdSectorAddr=%08X, rdbufIndex=%04X,nItem=%02X, lastbufIndex=%04X\r\n",
+				rdSectorAddr,			rdbufIndex,			numItem, lastbufIndex);
+#endif
+		WriteSFlash4kSectorData(rdSectorAddr, sFlashBuffer);
+
+		////////// 확장 영역에 씀
 		for(uint16_t i = 0; i < NUM_OF_DIR_RFCARD_SECTOR; i++)   //	1024
 		{
 			sFlash4kAddr = FLASH_RfCardData_Direct_Start + (i * 0x1000);
@@ -583,7 +539,7 @@ uint8_t NewWriteRfCardDataToSerialFlash( uint8_t *stCardData)
 			printf( "NewWriteRfCardDataToSerialFlash rdSectorAddr=%08X, sFlash4kAddr=%08X,nItem=%02X, lastbufIndex=%04X\r\n",
 					rdSectorAddr,			sFlash4kAddr,			numItem, lastbufIndex);
 #endif
-			if( (numItem == 0x0) || (numItem == 0xFF) )
+			if( (numItem == 0x0) || (numItem > NUM_OF_DIR_RFCARD_PER_SECTOR) || (numItem == 0xFF))
 			{	// 처음 저장 인것
 				setItem = 0;
 				sFlashBuffer[IDX_OF_DIR_RFCARD_COUNT] = 0;
@@ -596,7 +552,7 @@ uint8_t NewWriteRfCardDataToSerialFlash( uint8_t *stCardData)
 				nReturn = Card_Registerd_OK;
 				break;
 			}
-			else
+			else   // numItem == NUM_OF_DIR_RFCARD_PER_SECTOR
 			{ 	// 갯 수 넘어감. 공간 없슴
 				nReturn = Card_No_Space;
 				continue;
@@ -609,7 +565,7 @@ uint8_t NewWriteRfCardDataToSerialFlash( uint8_t *stCardData)
 		if( nReturn == Card_Registerd_OK)   // 버퍼에 쓰기 완료한 데이터를 플래쉬 섹터에 저장
 		{
 			rdbufIndex = (setItem*SIZE_OF_DIR_RFCARD_DATA);
-			memcpy( sFlashBuffer+rdbufIndex+0, stCardData, 16);
+			memcpy( sFlashBuffer+rdbufIndex+0, stCardData, 16);  // 카드데이터 전부 저장
 
 			sFlashBuffer[IDX_OF_DIR_RFCARD_COUNT] += 1;
 
@@ -638,6 +594,35 @@ uint8_t NewWriteRfCardDataToSerialFlash( uint8_t *stCardData)
 	return Card_No_Space;//추가공간에도 넣을 공간이 없으면..
 }
 
+uint8_t CheckDefaultCard(  uint8_t *dCardData)
+{
+#ifdef KT_WEST_MEMBER
+	if( ((dCardData[0] == 0x00) && (dCardData[1] == 0x18) && (dCardData[2] == 0x12) && (dCardData[3] == 0x7B) ) ||
+		((dCardData[0] == 0x28) && (dCardData[1] == 0x7F) && (dCardData[2] == 0x17) && (dCardData[3] == 0x11) ) ||
+		((dCardData[0] == 0x00) && (dCardData[1] == 0x49) && (dCardData[2] == 0x12) && (dCardData[3] == 0x7C) ) ||
+		((dCardData[0] == 0x00) && (dCardData[1] == 0x7D) && (dCardData[2] == 0x12) && (dCardData[3] == 0x7B) ) ||
+		((dCardData[0] == 0xA0) && (dCardData[1] == 0xE4) && (dCardData[2] == 0x12) && (dCardData[3] == 0x7C) ) ||
+		((dCardData[0] == 0x00) && (dCardData[1] == 0xD0) && (dCardData[2] == 0x12) && (dCardData[3] == 0x7C) ) )
+	{
+		return true;
+	}
+#endif
+#ifdef GRVERNMENT_MEMBER
+	if( ((dCardData[0] == 0x00) && (dCardData[1] == 0xAC) && (dCardData[2] == 0xA5) && (dCardData[3] == 0xDB) ))
+	{
+		return true;
+	}
+#endif
+#ifdef GUUI_AKT_MEMBER
+	 if( ((dCardData[0] == 0x97) && (dCardData[1] == 0xB8) && (dCardData[2] == 0x4B) && (dCardData[3] == 0x3C) ) ||
+		 ((dCardData[0] == 0xB7) && (dCardData[1] == 0x98) && (dCardData[2] == 0x75) && (dCardData[3] == 0x3C) )  )
+	{
+		return true;
+	}
+#endif
+	return false;
+}
+
 uint8_t WriteRfCardDataBlockToSerialFlash(uint8_t *cardData){//address형 card data 블럭으로 쓰기..
 /*
 ID_Address(2) : 카드데이터 중 앞2바이트
@@ -661,7 +646,7 @@ uint8_t DeleteRfCardDataOnSerialFlash( uint8_t *cardData, uint8_t u8Flag)
 {	//본래 영역 카드데이터 지우기..
 	uint16_t ulFor, lastbufIndex, rdbufIndex;
 	uint8_t numItem = 0, setItem;
-	uint8_t nReturn = 0;
+	uint8_t nReturn = 0xFF;
 	uint16_t rdSectorIndex;
 	uint32_t rdSectorAddr;
 	uint32_t bitRegOrNot;
@@ -756,6 +741,89 @@ uint8_t DeleteRfCardDataOnSerialFlash( uint8_t *cardData, uint8_t u8Flag)
 	return  Card_Not_Registerd; //추가공간 끝까지 찾았는데도 없으면..
 }
 
+uint8_t  GetRfCardDataInFlash(uint8_t * cardAddr /* in */, uint8_t * dataBuf /* out  */)
+{
+	uint16_t u16CardAddress;
+	uint16_t u16SavedJulianDate, u16CurrentJulianDate; //MMDDYY
+
+	u16CardAddress  = cardAddr[0]*0x100 + cardAddr[1];//주소를 계산하기 위해서..시리얼 번호. cardData[2,3]은 회사 번호로 바뀌지 않음
+	sFlash4kAddr = FLASH_RfCardData_Start + (u16CardAddress * SIZE_OF_RFCARD_RSLOT);
+	//#define	FLASH_MpCardData_Start		0x02092000L
+	// 해당 어드레스 슬롯의 데이터만 가지고 판단 하므로 슬롯 길이 만큼만 읽는디.
+	xREAD_DataFromExNorFlash( sFlash4kAddr, sFlashBuffer, SIZE_OF_RFCARD_RSLOT);       //SIZE_OF_RFCARD_RSLOT 256
+
+	uint8_t nItem =  sFlashBuffer[NUM_OF_RFCARD_DATA_PER_RSLOT * SIZE_OF_RFCARD_DATA];	// 0x200+(31*16))
+
+#ifdef DEBUG_MODE
+	printf( "GetRfCardDataInFlash u16CardAddress=%04X, sFlash4kAddr=%08X,nItem=%02X\r\n",
+			u16CardAddress,			sFlash4kAddr,			nItem);
+#endif
+	if( (nItem == 0x0) || (nItem == 0xFF) )	// first time to write
+	{
+		return 0;
+	}
+	else if( nItem <= NUM_OF_RFCARD_DATA_PER_RSLOT )  //   15면 가득 찼슴
+	{	// 슬롯이 비어있 지 않음.
+		memcpy( dataBuf,  sFlashBuffer, nItem * SIZE_OF_RFCARD_DATA);	// 찾은 Data 번호 저장
+		return nItem;//
+	}
+	else	// numItem => 15 ~ 255
+	{
+		return 0;
+	}
+
+	// 없으면 기본 저장공간에 없으면 추가공간에서 확인
+	return 0;
+}
+
+uint32_t GetRfCardCountInFlash(void)
+{	//기본 address형 rf card data에서 찾기.. 카드 index값과 함께 return..
+	uint32_t u32ReturnCount = 0;
+
+	uint16_t ulFor, lastbufIndex, rdbufIndex;
+	uint8_t  numItem = 0, setItem;
+
+	uint8_t  nReturn = 0;
+	uint16_t rdSectorIndex;
+	uint32_t rdSectorAddr;
+	uint32_t wrSectorAddr;
+	uint32_t nUid, nForAddr;
+
+	for ( nForAddr = FLASH_RfCardData_Start; nForAddr < FLASH_RfCardData_End; nForAddr += 0x1000)
+	{
+		xREAD_DataFromExNorFlash( nForAddr, sFlashBuffer, 0x1000);
+
+		for ( nUid = 0; nUid < NUM_OF_RSLOT_PER_SECTOR; nUid++)
+		{
+			rdSectorIndex = nUid * SIZE_OF_RFCARD_RSLOT;
+			//  sFlashBuffer // 마지막 정보를 읽고 데이터 숫자를 0으로 지음
+			lastbufIndex = rdSectorIndex + ( NUM_OF_RFCARD_DATA_PER_RSLOT * SIZE_OF_RFCARD_DATA );
+			// 0xN00+(15*16))
+			numItem = sFlashBuffer[lastbufIndex+0];  //  last information buffer[0]
+
+			if( (numItem > 0x0) && ( numItem <= NUM_OF_RFCARD_DATA_PER_RSLOT ) ) //   15면 가득 찼슴
+			{	// 슬롯이 비어있 지 않음.
+				u32ReturnCount += numItem;
+			}
+		}
+		HAL_IWDG_Refresh(&hiwdg);
+	}
+	// 다이렉트 섹터 데이터 크리어 -> 기본 저장공간에 지우고 추가공간에서 확인
+	for(uint16_t i = 0; i < NUM_OF_DIR_RFCARD_SECTOR; i++)
+	{ // 1024
+		sFlash4kAddr = FLASH_RfCardData_Direct_Start + (i*SIZE_OF_DIR_RFCARD_SLOT);  //
+		xREAD_DataFromExNorFlash( sFlash4kAddr, sFlashBuffer, SIZE_OF_DIR_RFCARD_SLOT );  // 섹터 데이터 읽음
+
+		numItem = sFlashBuffer[NUM_OF_DIR_RFCARD_PER_SECTOR*SIZE_OF_DIR_RFCARD_DATA];
+		if( (numItem > 0x0) && ( numItem <= NUM_OF_DIR_RFCARD_PER_SECTOR ) ) //   227면 가득 찼슴
+		{	// 슬롯이 비어있 지 않음.
+			u32ReturnCount += numItem;
+		}
+		HAL_IWDG_Refresh(&hiwdg);
+	}
+	return u32ReturnCount;
+}
+
 uint8_t EraseSFlash(uint32_t u32StartAddress, uint32_t u32EndAddress)
 {
 	uint32_t sFlash_addr = u32StartAddress;
@@ -836,40 +904,56 @@ void WriteSFlash4kSectorData( uint32_t sectorAddress, uint8_t * buf4kData)
 uint8_t AddAuthorityToSerialFlash( uint8_t *strPinData, uint8_t *strCardData, uint8_t nPort)
 {   //.
 	uint16_t numItem = 0;
-	uint8_t nReturn = 0;
+	uint8_t nReturn = 0xFF;
 	uint16_t rdIndex;
 	uint32_t rdSecCnt;
 
-	if( CheckRfCardDataInFlash(strCardData) == Card_Not_Registerd)
+#ifdef LOG_DEBUG
+	printf( "AddAuthorityToSerialFlash Card%02X%02X%02X%002X,Pin%02X%02X%02X%02X%02X%02X%02X%02X\r\n",
+			strCardData[0], strCardData[1], strCardData[2], strCardData[3],
+			strPinData[0], strPinData[1], strPinData[2], strPinData[3],
+			strPinData[4], strPinData[5], strPinData[6], strPinData[7]);
+#endif
+
+	memcpy( NewCardParam.stParam.Pin, strPinData, 8);
+	memcpy( NewCardParam.stParam.CardId, strCardData, 4);
+
+	if( CheckRfCardDataInFlash(strCardData, 0) == Card_Not_Registerd)
 	{
 #ifdef DEBUG_MODE
 		printf( "AddAuthorityToSerialFlash isn't stCardData.\n\r");
 #endif
+		NewCardParam.stParam.DoorAuth_CardKind = ((0x80 >> nPort) + 0x01);  //  All door 1111 권한  || 1:상시 ID.  2:일시 ID.  3:당일카드 ID.
+//				UseCard.stParam.DoorAuth_CardKind = 0xF1;  //  All door 1111 권한  || 1:상시 ID.  2:일시 ID.  3:당일카드 ID.
+		NewCardParam.stParam.PassCode[0] = 0x99; // 사용기한 자리에 지정카드용 ACU 번호가 두개 들어감
+		NewCardParam.stParam.PassCode[1] = 0x31; // 사용기한 자리에 지정카드용 ACU 번호가 두개 들어감
+		NewCardParam.stParam.Location = 2;
+
+		return NewWriteRfCardDataToSerialFlash(NewCardParam.u8strParam);
 	}
 	else   /// 등록 되어 있슴
 	{
 #ifdef DEBUG_MODE
 		printf( "AddAuthorityToSerialFlash Result Card%02X%02X%02X%002X,Pin%02X%02X%02X%02X%02X%02X%02X%02X\r\n",
-			CardParameter.stParam.CardId[0], CardParameter.stParam.CardId[1], CardParameter.stParam.CardId[2], CardParameter.stParam.CardId[3],
-			CardParameter.stParam.Pin[0], CardParameter.stParam.Pin[1],CardParameter.stParam.Pin[2],CardParameter.stParam.Pin[3],
-			CardParameter.stParam.Pin[4],CardParameter.stParam.Pin[5],CardParameter.stParam.Pin[6],CardParameter.stParam.Pin[7]);
+			NewCardParam.stParam.CardId[0], NewCardParam.stParam.CardId[1], NewCardParam.stParam.CardId[2], NewCardParam.stParam.CardId[3],
+			NewCardParam.stParam.Pin[0], NewCardParam.stParam.Pin[1], NewCardParam.stParam.Pin[2], NewCardParam.stParam.Pin[3],
+			NewCardParam.stParam.Pin[4], NewCardParam.stParam.Pin[5], NewCardParam.stParam.Pin[6], NewCardParam.stParam.Pin[7]);
 #endif
-		CardParameter.stParam.DoorAuth_CardKind |= (0x80 >> nPort);  //  All door 1111 권한  || 1:상시 ID.  2:일시 ID.  3:당일카드 ID.
+		NewCardParam.stParam.DoorAuth_CardKind |= (0x80 >> nPort);  //  All door 1111 권한  || 1:상시 ID.  2:일시 ID.  3:당일카드 ID., 4  모바일 카드
 
-		OverWriteRfCardDataToSerialFlash( CardParameter.u8strParam);
+		nReturn = OverWriteRfCardDataToSerialFlash( NewCardParam.u8strParam);
 	}
-
-	return 1; //
+	return nReturn; //
 }
 
 uint8_t DeleteAuthorityFromSerialFlash( uint8_t *strPinData, uint8_t *strCardData, uint8_t nPort)
 {
 	uint16_t numItem = 0;
-	uint8_t nReturn = 0;
+	uint8_t nReturn = 0xFF;
 	uint16_t rdIndex;
 	uint32_t rdSecCnt;
 
-	if( CheckRfCardDataInFlash(strCardData) == Card_Not_Registerd)
+	if( CheckRfCardDataInFlash(strCardData, 0) == Card_Not_Registerd)
 	{
 #ifdef DEBUG_MODE
 		printf( "DeleteAuthorityFromSerialFlash isn't stCardData.\n\r");
@@ -879,26 +963,26 @@ uint8_t DeleteAuthorityFromSerialFlash( uint8_t *strPinData, uint8_t *strCardDat
 	{
 #ifdef DEBUG_MODE
 		printf( "DeleteAuthorityFromSerialFlash Result Card%02X%02X%02X%002X,Pin%02X%02X%02X%02X%02X%02X%02X%02X\r\n",
-			CardParameter.stParam.CardId[0], CardParameter.stParam.CardId[1], CardParameter.stParam.CardId[2], CardParameter.stParam.CardId[3],
-			CardParameter.stParam.Pin[0], CardParameter.stParam.Pin[1],CardParameter.stParam.Pin[2],CardParameter.stParam.Pin[3],
-			CardParameter.stParam.Pin[4],CardParameter.stParam.Pin[5],CardParameter.stParam.Pin[6],CardParameter.stParam.Pin[7]);
+				NewCardParam.stParam.CardId[0], NewCardParam.stParam.CardId[1], NewCardParam.stParam.CardId[2], NewCardParam.stParam.CardId[3],
+				NewCardParam.stParam.Pin[0], NewCardParam.stParam.Pin[1], NewCardParam.stParam.Pin[2], NewCardParam.stParam.Pin[3],
+				NewCardParam.stParam.Pin[4], NewCardParam.stParam.Pin[5], NewCardParam.stParam.Pin[6], NewCardParam.stParam.Pin[7]);
 #endif
-		CardParameter.stParam.DoorAuth_CardKind &= ~(0x80 >> nPort);  //  All door 1111 권한  || 1:상시 ID.  2:일시 ID.  3:당일카드 ID.
+		NewCardParam.stParam.DoorAuth_CardKind &= ~(0x80 >> nPort);  //  All door 1111 권한  || 1:상시 ID.  2:일시 ID.  3:당일카드 ID. 4: 모바일카드
 
-		OverWriteRfCardDataToSerialFlash( CardParameter.u8strParam);
+		nReturn = OverWriteRfCardDataToSerialFlash( NewCardParam.u8strParam);
 	}
 
-	return 1; //
+	return nReturn; //
 }
 
 uint8_t GetAuthorityFromSerialFlash( uint8_t *strPinData, uint8_t *strCardData)
 {
 	uint16_t numItem = 0;
-	uint8_t nReturn = 0;
+	uint8_t nReturn = 0xFF;
 	uint16_t rdIndex;
 	uint32_t rdSecCnt;
 
-	if( CheckRfCardDataInFlash(strCardData) == Card_Not_Registerd)
+	if( CheckRfCardDataInFlash(strCardData, 0) == Card_Not_Registerd)
 	{
 #ifdef DEBUG_MODE
 		printf( "GetAuthorityFromSerialFlash isn't stCardData.\n\r");
@@ -908,10 +992,10 @@ uint8_t GetAuthorityFromSerialFlash( uint8_t *strPinData, uint8_t *strCardData)
 	{
 #ifdef DEBUG_MODE
 		printf( "GetAuthorityFromSerialFlash Result Card%02X%02X%02X%002X, Atho=%02X\r\n",
-			CardParameter.stParam.CardId[0], CardParameter.stParam.CardId[1], CardParameter.stParam.CardId[2], CardParameter.stParam.CardId[3],
-			CardParameter.stParam.DoorAuth_CardKind);
+				NewCardParam.stParam.CardId[0], NewCardParam.stParam.CardId[1], NewCardParam.stParam.CardId[2], NewCardParam.stParam.CardId[3],
+				NewCardParam.stParam.DoorAuth_CardKind);
 #endif
-		nReturn = CardParameter.stParam.DoorAuth_CardKind;  //  All door 1111 권한  || 1:상시 ID.  2:일시 ID.  3:당일카드 ID.
+		nReturn = NewCardParam.stParam.DoorAuth_CardKind;  //  All door 1111 권한  || 1:상시 ID.  2:일시 ID.  3:당일카드 ID., 4 : 모바일카드
 	}
 
 	return nReturn; //

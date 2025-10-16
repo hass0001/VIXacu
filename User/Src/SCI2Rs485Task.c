@@ -294,6 +294,8 @@ void ConsoleDataSendStart(void)
     Rs485Tx2Ctr = (INT8U)(Rs485CommTx2Buf[1] + 3);
     Rs485Tx2Ptr = &Rs485CommTx2Buf[0];
 
+    PCALED_485TxNoticeProc(Rs485CommTx2Buf[CS_INDEX_ID]);
+
 #if 0
 		uint8_t nLength;
 		if( Rs485Tx2Ctr > 70) nLength = 70;
@@ -575,6 +577,20 @@ INT8U ConsoleDataReceive(void)
 {
   if( Rs485Tx2Enable == 1)
   {
+#ifdef LOG_DEBUG
+              INT16U i = 0;
+              INT16U length = 0;
+              length = (INT16U)CopyRx2Rs485Buf[1];
+              if(CopyRx2Rs485Buf[2] != 0x02)
+              {
+                  rprintf( "[Console Recv]: ");
+                  for(i = 0; i<length+3; i++)
+                  {
+                      rprintf( "%02X ", CopyRx2Rs485Buf[i]);
+                  }
+                  rprintf( "\r\n");
+              }
+#endif
             if( (CheckSumVerify() == ChkGood) && (CopyRx2Rs485Buf[3] == ConsolePollIndex) )        //checksum ok.. and if target console ID..
             {
               ConsoleCommStat[ConsolePollIndex] = CommOK;
@@ -590,20 +606,6 @@ INT8U ConsoleDataReceive(void)
                   ConsoleRestoreCounter[ConsolePollIndex] = 0;
                 }
               }
-#ifdef LOG_DEBUG
-              INT16U i = 0;
-              INT16U length = 0;
-              length = (INT16U)CopyRx2Rs485Buf[1];
-              if(CopyRx2Rs485Buf[2] != 0x02)
-              {
-                  rprintf( "[Console Recv]: ");
-                  for(i = 0; i<length+3; i++)
-                  {
-                      rprintf( "%02X ", CopyRx2Rs485Buf[i]);
-                  }
-                  rprintf( "\r\n");
-              }
-#endif
               return TRUE;
             }
             else
@@ -664,37 +666,60 @@ void AnalysisConsoleRxData(void)
     case CONTROL_CS_ACCREQ:     //CONTROL_CS_ACCREQ    	        = 0xB2
 //cr747 방식은 CONTROL_CS_AWAYSTAY 0xb1의 데이터는 Time(6Byte) + Card ID(8Byte) + Away/Stay Data 근데.. 앞쪽부터 카드값임.. 12345678 00000000
 //cr747 방식은 CONTROL_CS_ACCREQ   0xb1의 데이터는 Time(6Byte) + Card ID(8Byte) + Access Type 
-    	if( g_isSetReader == 0)
+     	if( g_isSetReader == 0)
     	{
     		// CopyRx2Rs485Buf[CS_INDEX_ID] 에 의한 설정 도어 번호, 사용자 설정에서 출입문 사용 권한을 다르게 주면 안 됨.
     		uint8_t n485Door = ConsoleParameter.DoorNumber[CopyRx2Rs485Buf[CS_INDEX_ID]];
-    		u16CardResult = CheckRfCardDataInFlash(CopyRx2Rs485Buf + CS_INDEX_DATA + 6);
+
+#ifdef DEBUG_MODE
+	printf( "AnalysisConsoleRxData n485Door=%02X, CopyRx2Rs485Buf[CS_INDEX_ID]=%02X. %02X %02X %02X %02X %02X %02X %02X %02X \r\n",
+			n485Door,	CopyRx2Rs485Buf[CS_INDEX_ID], CopyRx2Rs485Buf[CS_INDEX_DATA + 6], CopyRx2Rs485Buf[CS_INDEX_DATA + 7], CopyRx2Rs485Buf[CS_INDEX_DATA + 8],
+			 CopyRx2Rs485Buf[CS_INDEX_DATA + 9], CopyRx2Rs485Buf[CS_INDEX_DATA + 10], CopyRx2Rs485Buf[CS_INDEX_DATA + 11], CopyRx2Rs485Buf[CS_INDEX_DATA + 12],
+			 CopyRx2Rs485Buf[CS_INDEX_DATA + 13]);
+#endif
+    		u16CardResult = CheckRfCardDataInFlash((CopyRx2Rs485Buf + CS_INDEX_DATA + 6), 1);
 			u8Result = CheckEventCardAndLog( n485Door, CopyRx2Rs485Buf +CS_INDEX_DATA+ 6, u16CardResult);
-			if(u8Result == 0)
+			if(u8Result == Result_OK)
 			{   //  #define  Result_OK  0
 				ConsoleResultPack(1); //  {  IDX_AUDIOMENT_DOOR_OPEN, IDX_AUDIOMENT_MUTE_100MS}, // 0x01
+#ifdef DEBUG_MODE
+	printf( "AnalysisConsoleRxData ConsoleResultPack 1 result=%02X\r\n", u8Result);
+#endif
 
 //				memcpy(&SdpParameter.CardData[0], &CopyRx2Rs485Buf[CS_INDEX_DATA+6], 8);
 				//		RESTClient_SetPacketReady( UHS_Type_AccessInfo102);
 			}
-			else
+			else if(u8Result == Result_Wrong_Zone)
 			{
+#ifdef DEBUG_MODE
+	printf( "AnalysisConsoleRxData ConsoleResultPack 2 result=%02X\r\n", u8Result);
+#endif
+				ConsoleResultPack(8); // {  IDX_AUDIOMENT_NO_REGISTERD_CARD, IDX_AUDIOMENT_CHECK_USE_AGAIN}, // 0x02
+			}
+			else //  == Card_No_Granted)
+			{
+#ifdef DEBUG_MODE
+	printf( "AnalysisConsoleRxData ConsoleResultPack 2 result=%02X\r\n", u8Result);
+#endif
 				ConsoleResultPack(2); // {  IDX_AUDIOMENT_NO_REGISTERD_CARD, IDX_AUDIOMENT_CHECK_USE_AGAIN}, // 0x02
 			}
 			ConsoleAccessMethod();
     	}
     	else
-    	{   // 모니터 프로그램에서 카드 등록 몯로 설정한 경우
-    		memcpy(CardParameter.stParam.CardId, &CopyRx2Rs485Buf[CS_INDEX_DATA+6], 4);
+    	{   // 모니터 프로그램에서 카드 등록 모드로 설정한 경우
+#ifdef DEBUG_MODE
+	printf( "AnalysisConsoleRxData Crd Register result=%02X\r\n", u8Result);
+#endif
+   		memcpy(NewCardParam.stParam.CardId, &CopyRx2Rs485Buf[CS_INDEX_DATA+6], 4);
 //    	    INT8U CardId[4];			// ID 4
-//    	    INT8U DoorAuth_CardKind;                 // 1 : 상시 ID.	2 : 일시 ID.	3 : 당일카드 ID.
+//    	    INT8U DoorAuth_CardKind;    // All door 1111 권한 || 1 : 상시 ID.	2 : 일시 ID.	3 : 당일카드 ID., 4 : 모바일카드
 //    	    INT8U PassCode[2];      // 카드+비밀번호 사용시) 현재는 0x00, 0x00 으로 전송
-    		memcpy(CardParameter.stParam.Pin, "48500485", 8);
-    		CardParameter.stParam.DoorAuth_CardKind  = 0x1;//■ 카드종류/도어/안티패스 형식 : 1111 도어, 1 안티패스, 111 종류
-	        CardParameter.stParam.PassCode[0] = 0x99;//여기에 사용기한이 julian date 로 2바이트가 들어간다..
-	        CardParameter.stParam.PassCode[1] = 0x31;//여기에 사용기한이 julian date 로 2바이트가 들어간다..
-	        CardParameter.stParam.Location = 0;
-    	    uint8_t nResult = WriteRfCardDataToSerialFlash(CardParameter.u8strParam);
+    		memcpy(NewCardParam.stParam.Pin, "48500485", 8);
+    		NewCardParam.stParam.DoorAuth_CardKind  = 0xF1;//■ 카드종류/도어/안티패스 형식 : 1111 도어, 1 안티패스, 111 종류
+    		NewCardParam.stParam.PassCode[0] = 0x99;//여기에 사용기한이 julian date 로 2바이트가 들어간다..
+    		NewCardParam.stParam.PassCode[1] = 0x31;//여기에 사용기한이 julian date 로 2바이트가 들어간다..
+    		NewCardParam.stParam.Location = 0;
+    	    uint8_t nResult = WriteRfCardDataToSerialFlash(NewCardParam.u8strParam);
     		MakeReaderToReportCard(&CopyRx2Rs485Buf[CS_INDEX_DATA+6], nResult);
     	}
 
@@ -811,7 +836,7 @@ void AnalysisConsoleRxData(void)
 
     case 0xEB : 
 // Door Auth(8), antiPass(1), cardType(3), resultvalue(4) == 검색결과(0있음, 1기간지났음, 2이미존재?(쓸 때), 3없음)
-      u16CardResult = CheckRfCardDataInFlash( &CopyRx2Rs485Buf[16]) & 0x00ff; //카드데이터 검색!!
+      u16CardResult = CheckRfCardDataInFlash( &CopyRx2Rs485Buf[16], 1) & 0x00ff; //카드데이터 검색!!
       u8Port = CopyRx2Rs485Buf[3];//콘솔아이디..
       if(u16CardResult == 0x0010 && CopyRx2Rs485Buf[7] == 'N')
       { //ACU에는 등록되어 있는데 비등록카드로 오면
@@ -1215,7 +1240,7 @@ void  ConsoleCheckCardData(void)
   uint8_t   nReturn;
   uint8_t *pCard = &CopyRx2Rs485Buf[CS_INDEX_DATA];
 
-  nReturn = CheckRfCardDataInFlash(pCard);
+  nReturn = CheckRfCardDataInFlash(pCard, 1);
   
   ConsoleResultPack( nReturn);
 }

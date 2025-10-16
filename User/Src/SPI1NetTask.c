@@ -17,6 +17,7 @@
 #define    SPI1_GLOBALS
 
 #include   "SPI1NetTask.h"
+#include "Version_Plus.h"
 
 const uint16_t con16JulianDateArray[13] = {0, 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};//365
                                 //      31,+28,+31, +30, +31, +30, +31, +31, +30, +31, +30,  +31  // 占쏙옙占쏙옙 占싹쇽옙..
@@ -34,6 +35,8 @@ INT16U SSD_len = 0;
 // #define AUTO_SEND_EVENT
 #define SIZE_OF_TOKEN_EVENT 128
 #define OS_Delay	MyMsDelay
+
+#define DELETE_OPERATION
 
 extern _HTTPC_GetPostTypeDef HTTP_RestCmd[MAX_NUM_DOOR];
 extern int32_t TCPS_Handler(uint8_t SockNum);
@@ -73,29 +76,31 @@ void SPI1NetTask( void)
 
     if( bRequestNeed == MON_NEED_SPI1_FWUD) 
 	{//업뎃완료후.. case  FWD_TYP_END:    // (7)
-      checkCrc = getExtFlashCRC( FIRM_START_NEW_ADDR, ulBinLen );
-      if( checkCrc == ulBinCrc)
-      {
-          WriteUpdateInfoFlag( UPDATE_FROM_NEW, UPDATE_NEED ); 
-          rprintf("[NOTICE]System Reset for Upgrade!\r\n");
-          NVIC_SystemReset();  // 맞으면.. System Reset
-      }
-      else
-      {
-          bRequestNeed = MON_FROM_USER;
-          rprintf("[NOTICE]Checksum Error!\r\n");
-      }
-      Firmware_Upgrade = USER_UPGRADE_NONE;
-//      OS_ResumeAllSuspendedTasks();
-    /*
-    */
+		  checkCrc = getExtFlashCRC( FIRM_START_NEW_ADDR, ulBinLen );
+		  if( checkCrc == ulBinCrc)
+		  {
+			  WriteUpdateInfoFlag( UPDATE_FROM_NEW, UPDATE_NEED );
+			  rprintf("[NOTICE]System Reset for Upgrade!\r\n");
+			  NVIC_SystemReset();  // 맞으면.. System Reset
+		  }
+		  else
+		  {
+			  bRequestNeed = MON_FROM_USER;
+			  rprintf("[NOTICE]Checksum Error!\r\n");
+		  }
+		  Firmware_Upgrade = USER_UPGRADE_NONE;
+		//      OS_ResumeAllSuspendedTasks();
+		/*
+		*/
     }
     else 
 	{
 #ifdef DEBUG_MODE        
       if (nNetTaskCycle > 50000)
 	  {  // 100 mS * 50000 = 5000 Sec
-        nNetTaskCycle = 0;
+    	  nNetTaskCycle = 0;
+ //   	  if(httpc_isConnected)
+ //   		  HTTP_TestHttpPacketRtLog();
       }
       else
 	  {
@@ -348,7 +353,7 @@ INT16U NetMessageCheck(byte *RxBuffer )
 	return nId;
 }
 
-void TAMakeServerPacking(void)
+void TAMakeServerPacking(void)  // 4C47
 {
  	GVTAComData.length = (uint16_t)strlen(TABuf_Tx);
 	GVTAComData.SetPacket = TRUE;
@@ -361,6 +366,8 @@ void TAPacketAnalysis(void)
   INT8U ReceiveTime[7];
   INT8U nResult = 0;
   
+  unionCard_Parameter TcpCardParam;        // 39
+
   t50msTim6_Tcp = 0;  // 계속 통신이 되고 있으면 새로 시작. 10초가 지나면 TCP서버를 리셋안다.
 
   ProtocolType = (INT16U)((TABuf_Rx[TA_INDEX_CMD1]*256)+TABuf_Rx[TA_INDEX_CMD2]);
@@ -390,8 +397,8 @@ void TAPacketAnalysis(void)
       ReceiveTime[6] = (TABuf_Rx[TA_INDEX_DAT+3]  > 6)? 0:TABuf_Rx[TA_INDEX_DAT+3];  // 요일(1) : 일(0x00) 월(0x01) 화(0x02) 수(0x03) 목(0x04) 금(0x05) 토(0x06).
       
    //   SetToDay(ReceiveTime);
-  	 RTC_SetTimeAndDate( &toDayTime, &ReceiveTime[0] );
-       EEPROMSetDataBlock(EEPROM_ADDRESS_DateTime, (INT8U*)ReceiveTime, 7);
+  	  RTC_SetTimeAndDate( &toDayTime, &ReceiveTime[0] );
+      EEPROMSetDataBlock(EEPROM_ADDRESS_DateTime, (INT8U*)ReceiveTime, 7);
 //      rprintf( "[TA]->Time 20%02x.%02x.%02x %02x:%02x:%02x(%x)\r\n",
 //             toDayTime.YEAR, toDayTime.MON, toDayTime.DATE, 
 //             toDayTime.HOUR, toDayTime.MIN, toDayTime.SEC, toDayTime.WeekDAY);
@@ -478,32 +485,32 @@ void TAPacketAnalysis(void)
 
     case TA_StrCmdSetIDsg:
     {         // 0x4941  //  ("IA")  //  ID자료 개별 저장.
-		memcpy(CardParameter.stParam.CardId, TABuf_Rx+TA_INDEX_DAT+12, 4);//TA_INDEX_DAT 7, 총 16바이트 카드데이터 중 카드 4바이트 방식은 0~11 : 0으로 채워서 옴
+		memcpy(TcpCardParam.stParam.CardId, TABuf_Rx+TA_INDEX_DAT+12, 4);//TA_INDEX_DAT 7, 총 16바이트 카드데이터 중 카드 4바이트 방식은 0~11 : 0으로 채워서 옴
 		if( TABuf_Rx[TA_INDEX_LENL] >= 48)
-			memcpy(CardParameter.stParam.Pin, TABuf_Rx+TA_INDEX_DAT+28, 8);//TA_INDEX_DAT 7, 총 8바이트 pin 마지막에 추가
+			memcpy(TcpCardParam.stParam.Pin, TABuf_Rx+TA_INDEX_DAT+28, 8);//TA_INDEX_DAT 7, 총 8바이트 pin 마지막에 추가
 		else
-			memcpy(CardParameter.stParam.Pin, "Untitled", 8);//TA_INDEX_DAT 7, 총 8바이트 pin 마지막에 추가
+			memcpy(TcpCardParam.stParam.Pin, "Untitled", 8);//TA_INDEX_DAT 7, 총 8바이트 pin 마지막에 추가
 
 		//TA를 기준으로 cardData[2], cardData[3], {Door Auth(4), antiPass(1), cardType(3)}, u16SavedJulianDate(16)
-		CardParameter.stParam.DoorAuth_CardKind = (TABuf_Rx[TA_INDEX_DAT+19]&0xf0)|((TABuf_Rx[TA_INDEX_DAT+16])&0x07);
+		TcpCardParam.stParam.DoorAuth_CardKind = (TABuf_Rx[TA_INDEX_DAT+19]&0xf0)|((TABuf_Rx[TA_INDEX_DAT+16])&0x07);
 		//■ 카드종류/도어/안티패스 형식 : 1111 도어, 1 안티패스, 111 종류
-		if(((CardParameter.stParam.DoorAuth_CardKind&0x07) == 2)||((CardParameter.stParam.DoorAuth_CardKind&0x07) == 3))
+		if(((TcpCardParam.stParam.DoorAuth_CardKind&0x07) == 2)||((TcpCardParam.stParam.DoorAuth_CardKind&0x07) == 3))
 		{ //일시 or 당일카드이면..
 			//TABuf_Rx[TA_INDEX_DAT+16] //■ 종류/도어/안티패스 형식 : 1111 도어, 1 안티패스, 111 카드종류 [마스터(0) 상시ID(1), 일시ID(2), 당일카드ID(3), 출입제한카드(4)]
 			uint16_t u16JulianDate; //MMDDYY
 			//    const uint16_t con16JulianDateArray[13] = {0, 1:0, 2:31, 3:59, 4:90, 5:120, 6:151, 7:181, 8:212, 9:243, 10:273, 11:304, 12:334};//365
 			u16JulianDate = (con16JulianDateArray[TABuf_Rx[TA_INDEX_DAT+26]] + TABuf_Rx[TA_INDEX_DAT+27])*100+TABuf_Rx[TA_INDEX_DAT+25];
 			// 올해 julian date * 100 + YY
-			CardParameter.stParam.PassCode[0] = u16JulianDate/0x100;//여기에 사용기한이 julian date 로 2바이트가 들어간다..
-			CardParameter.stParam.PassCode[1] = u16JulianDate%0x100;//여기에 사용기한이 julian date 로 2바이트가 들어간다..
+			TcpCardParam.stParam.PassCode[0] = u16JulianDate/0x100;//여기에 사용기한이 julian date 로 2바이트가 들어간다..
+			TcpCardParam.stParam.PassCode[1] = u16JulianDate%0x100;//여기에 사용기한이 julian date 로 2바이트가 들어간다..
 		}
 		else
 		{
-			CardParameter.stParam.PassCode[0] = TABuf_Rx[TA_INDEX_DAT+0];//사용기한 자리에 지정카드용 ACU 번호가 두개 들어감
-			CardParameter.stParam.PassCode[1] = TABuf_Rx[TA_INDEX_DAT+1];//사용기한 자리에 지정카드용 ACU 번호가 두개 들어감
+			TcpCardParam.stParam.PassCode[0] = TABuf_Rx[TA_INDEX_DAT+0];//사용기한 자리에 지정카드용 ACU 번호가 두개 들어감
+			TcpCardParam.stParam.PassCode[1] = TABuf_Rx[TA_INDEX_DAT+1];//사용기한 자리에 지정카드용 ACU 번호가 두개 들어감
 		}
 		//      CardParameter.stParam.Reserved   = 0;//TABuf_Rx[TA_INDEX_DAT+30];//보내오나 안씀.
-		nResult = WriteRfCardDataToSerialFlash(CardParameter.u8strParam);
+		nResult = WriteRfCardDataToSerialFlash(TcpCardParam.u8strParam);
       /*
 #define Card_Registerd_OK   0
 #define Card_No_Granted    1
@@ -522,56 +529,71 @@ void TAPacketAnalysis(void)
       nResult = WriteRfCardDataBlockToSerialFlash(TABuf_Rx + TA_INDEX_DAT);       //TA_INDEX_DAT 7
       break;
     }
+
+    case TA_StrCmdCheckIDsg :
+    {   // 0x4943  //  ("IC")  //  ID자료 검색,  권한 체크
+    	uint8_t wiegand[4];
+    	memcpy( wiegand, &TABuf_Rx[TA_INDEX_DAT], 4);  //
+    	uint16_t gu16CardResult = CheckRfCardDataInFlash( wiegand, 1);
+
+        TABuf_Tx[TA_INDEX_DAT+0] = (uint8_t)(gu16CardResult & 0x0F)+0x30;
+		TABuf_Tx[TA_INDEX_DAT+1] = (uint8_t)(gu16CardResult / 0x100);
+		TABuf_Tx[TA_INDEX_DAT+2] = TcpCardParam.stParam.DoorAuth_CardKind;     // 0xF1
+		TABuf_Tx[TA_INDEX_DAT+3] = TcpCardParam.stParam.PassCode[0];     //
+		TABuf_Tx[TA_INDEX_DAT+4] = TcpCardParam.stParam.PassCode[1];     //
+		memcpy( &TABuf_Tx[TA_INDEX_DAT+5], TcpCardParam.stParam.Pin, 8);
+    	break;
+    }
     
     case TA_StrCmdDeleteIDsg:
     {      // 0x4944  //  ("ID")  //  ID자료 개별 삭제.
-      memcpy(CardParameter.stParam.CardId, TABuf_Rx+TA_INDEX_DAT+12, 4);//TA_INDEX_DAT 7, 0~11 : 0으로 채워서 옴
-//      CardParameter.stParam.CardId[0] =   TABuf_Rx[TA_INDEX_DAT+12];  //TA_INDEX_DAT 7, 0~11 : 0으로 채워서 옴
-//      CardParameter.stParam.CardId[1] =   TABuf_Rx[TA_INDEX_DAT+13];
-//      CardParameter.stParam.CardId[2] =   TABuf_Rx[TA_INDEX_DAT+14];
-//      CardParameter.stParam.CardId[3] =   TABuf_Rx[TA_INDEX_DAT+15];
+      memcpy(TcpCardParam.stParam.CardId, TABuf_Rx+TA_INDEX_DAT+12, 4);//TA_INDEX_DAT 7, 0~11 : 0으로 채워서 옴
 #ifdef DELETE_OPERATION
-      nResult = DeleteRfCardDataOnSerialFlash(CardParameter.u8strParam, 0);
+      nResult = DeleteRfCardDataOnSerialFlash(TcpCardParam.u8strParam, 0);
 #endif
       TABuf_Tx[TA_INDEX_DAT+0] = nResult+0x30;
-
-#ifdef TACS_V244 //FW_TACS_STM_V1.4.04_SC_210302.bin       성능인증용 CS10S 통신기능 부여.. 
-//      for(int i=0; i < 3; i++){
-//        if(gU8ConsoleCardID[ (gU8ConsoleCardIDindex+i) % 20][0] == 0){//버퍼는 3개 세트만...
-//          int nIndex = (gU8ConsoleCardIDindex+i) % 20;
-          gU8ConsoleCardID[gU8ConsoleCardIDindexTCP][0] = 'D';//삭제..
-          memcpy(gU8ConsoleCardID[gU8ConsoleCardIDindexTCP]+1, TABuf_Rx+TA_INDEX_DAT+12, 4);//TA_INDEX_DAT 7, 0~11 : 0으로 채워서 옴
-          gU8ConsoleCardIDindexTCP++;
-          gU8ConsoleCardIDindexTCP %= 20;
-//          break;
-//        }
-//      }
-#endif  //FW_TACS_STM_V1.4.04_SC_210302.bin       성능인증용 CS10S 통신기능 부여.. 
-
       break;
     }
     
     case TA_StrCmdDeleteIDAll:
     {  // 0x4945  //  ("IE")  //  ID자료 전체 삭제.
- //     EraseSFlash(FLASH_MpCardData_Start, FLASH_MpCardData_End);//== ClearCardDataOfSerialFlashAll();
+ //     EraseSFlash(FLASH_MpCardData_Start, FLASH_MpCardData_End);
+   //== ClearCardDataOfSerialFlashAll();
       ClearRfCardIndexOnSerialFlash();  // 데이터를 전체 지우는 대신 인덱스를 전부 지운다.
-      //== ClearCardDataOfSerialFlashAll();
       TABuf_Tx[TA_INDEX_DAT+0] = '0';
       break;
     }
     
+    case TA_StrCmdCheckIDCnt:
+    {  //  0x4946  //  ("IF")  //  ID 전체 count.
+    	uint32_t nCount = GetRfCardCountInFlash();
+      TABuf_Tx[TA_INDEX_DAT+0] = '0';
+      TABuf_Tx[TA_INDEX_DAT+1] = (uint8_t)((nCount >> 24) & 0xFF);
+      TABuf_Tx[TA_INDEX_DAT+2] = (uint8_t)((nCount >> 16) & 0xFF);
+      TABuf_Tx[TA_INDEX_DAT+3] = (uint8_t)((nCount >> 8)  & 0xFF);
+      TABuf_Tx[TA_INDEX_DAT+4] = (uint8_t)((nCount >> 0)  & 0xFF);
+      break;
+    }
+
     case TA_StrCmdDeleteIDBlock:
     {// 0x494A  //	("IJ")  //  ID자료 특정블럭만 삭제.
-      memcpy(CardParameter.stParam.CardId, TABuf_Rx+TA_INDEX_DAT+12, 4); //TA_INDEX_DAT 7, 0~11 : 0으로 채워서 옴
-//      CardParameter.stParam.CardId[0] =   TABuf_Rx[TA_INDEX_DAT+12];   //TA_INDEX_DAT 7, 0~11 : 0으로 채워서 옴
-//      CardParameter.stParam.CardId[1] =   TABuf_Rx[TA_INDEX_DAT+13];
-//      CardParameter.stParam.CardId[2] =   TABuf_Rx[TA_INDEX_DAT+14];
-//      CardParameter.stParam.CardId[3] =   TABuf_Rx[TA_INDEX_DAT+15];
-      nResult = DeleteRfCardDataOnSerialFlash(CardParameter.u8strParam, 1);
+      memcpy(NewCardParam.stParam.CardId, TABuf_Rx+TA_INDEX_DAT+12, 4); //TA_INDEX_DAT 7, 0~11 : 0으로 채워서 옴
+      nResult = DeleteRfCardDataOnSerialFlash(NewCardParam.u8strParam, 1);
       TABuf_Tx[TA_INDEX_DAT+0] = nResult +'0';
       break;
     }
-    
+
+    case TA_StrCmdGetIDContent:
+    {		// 0x494C  //	("IL")  //  ID자료 내용을 전달
+    	uint8_t wiegand[4];
+    	memcpy( wiegand, &TABuf_Rx[TA_INDEX_DAT], 4);  //
+    	uint8_t u8CardCount = GetRfCardDataInFlash( wiegand, &TABuf_Tx[TA_INDEX_DAT+1]);
+
+    	TABuf_Tx[TA_INDEX_DAT+0] = u8CardCount;
+//    	 u8CardCount * SIZE_OF_RFCARD_DATA;
+    	break;
+    }
+
     case TA_StrCmdSetTimeCode :
     {    // 0x5441  //  ("TA")  //  TIME CODE 개별 설정.
 //Time Code Number(1) : 0~32 사이의 수
@@ -760,7 +782,9 @@ void TAPacketAnalysis(void)
         }
         else if( nLockMode == 2)
         {//0 수동풀림, 1 수동잠금, 2 스케줄, 3 일반모드
-          if((CMSParameter.DoorTimeCode[nlock][0] > 0)||(CMSParameter.DoorTimeCode[nlock][1] > 0)||(CMSParameter.DoorTimeCode[nlock][2] > 0))
+          if(     (CMSParameter.DoorTimeCode[nlock][0] > 0)||
+        		  (CMSParameter.DoorTimeCode[nlock][1] > 0)||
+				  (CMSParameter.DoorTimeCode[nlock][2] > 0)  )
           {//타임코드가 있으면..
             ChangeLockMode( LockMode_Schedule_Lock, nlock);//일단 스케줄 Lock 상태로 바꿔버림..
           }
@@ -780,6 +804,7 @@ void TAPacketAnalysis(void)
 //        rprintf("[NOTICE] Door Open Time Change!\r\n");
         CMSParameter.DoorOpenTime[nlock] = nDoorOpenTime;
         EEPROMSetData((INT16U)(E2P_Para_CMS+EEPROM_PARAM_INDEX_DOOROPENTIME+nlock), nDoorOpenTime);
+
         TABuf_Tx[TA_INDEX_DAT+0] = '0';
       }
       else
@@ -798,8 +823,21 @@ void TAPacketAnalysis(void)
       if((nDoorOpenTime <= 250) &&(nlock < MAX_NUM_RELAY))
       {
         ControlDoor( nDoorOpenTime, nlock);
-//        TATreatControl(nDoorOpenTime, nlock);
         TABuf_Tx[TA_INDEX_DAT+0] = '0';
+      }
+      else if(nlock == 0x0F)
+      {
+    	  if( nDoorOpenTime == 0xFF)   // 전체 개방
+    	  {
+    		  for( uint8_t ni = 0; ni < MAX_NUM_RELAY; ni++)
+				ChangeLockMode( LockMode_Manual_Unlock, ni);
+    	  }
+    	  else
+    	  {    // 전체 닫힘
+    		  for( uint8_t ni = 0; ni < MAX_NUM_RELAY; ni++)
+				ChangeLockMode( LockMode_Manual_Lock, ni);
+    	  }
+         TABuf_Tx[TA_INDEX_DAT+0] = '0';
       }
       else
       {
@@ -1019,7 +1057,8 @@ void TAPacketAnalysis(void)
 
     case TA_FWUPDATE_HEADER:
     {   //#define TA_FWUPDATE_HEADER     0x4648      //"FH"
-      if(Firmware_Upgrade != SPI1_UPGRADE_YES){
+      if(Firmware_Upgrade != SPI1_UPGRADE_YES)
+      {
         TABuf_Tx[TA_INDEX_DAT+0] = '1';
         TABuf_Tx[TA_INDEX_DAT+1] = 101;
       }
@@ -1156,7 +1195,28 @@ void TAPacketAnalysis(void)
 
     case TA_StrCmdFireOccur  :
     {       // 0x4643  //  ("FC")  //  화재 발생 / 복구
-      if(TABuf_Rx[TA_INDEX_DAT+0] == '1')
+        if (TABuf_Rx[TA_INDEX_DAT+0] == '0')
+        { //발생
+          //isFireAlertOccur = TRUE;
+//  #ifdef ENABLE_FIRE_ANNOUNCE
+          if(FireLockFlag != 99)
+          {//EEPROMGetData((INT16U) EEPROM_ADDRESS_FireFlag) != 99){//화재작동안함(99)이 아닐 경우
+             FireOccurrence = TRUE;
+             EEPROMSetData((INT16U) EEPROM_ADDRESS_FireFlag, 119);
+             TABuf_Tx[TA_INDEX_DAT+1] = '0';//발생..
+          }
+          else
+          {
+             FireOccurrence = 99;//화재인데 화재작동 안하는 경우는 여기에 해당함.. 노말모드로..
+             TABuf_Tx[TA_INDEX_DAT+1] = '3';//발생안시킴..
+          }
+          TABuf_Tx[TA_INDEX_DAT+0] = '0';//성공~
+//  #else
+//          TABuf_Tx[TA_INDEX_DAT+0] = '0';//성공~
+//          TABuf_Tx[TA_INDEX_DAT+1] = '3';//발생안시킴..
+//  #endif
+      }
+      else if(TABuf_Rx[TA_INDEX_DAT+0] == '1')
       {  //복구
         isFireAlertOccur = FALSE;
         FireOccurrence = FALSE;
@@ -1167,49 +1227,17 @@ void TAPacketAnalysis(void)
         TABuf_Tx[TA_INDEX_DAT+0] = '0';//성공~
         TABuf_Tx[TA_INDEX_DAT+1] = '1';//복구~
       }
-      else if (TABuf_Rx[TA_INDEX_DAT+0] == '0') { //발생
-        //isFireAlertOccur = TRUE;
-#ifdef ENABLE_FIRE_ANNOUNCE
-        if(FireLockFlag != 99)
-        {//EEPROMGetData((INT16U) EEPROM_ADDRESS_FireFlag) != 99){//화재작동안함(99)이 아닐 경우
-           FireOccurrence = TRUE;
-           EEPROMSetData((INT16U) EEPROM_ADDRESS_FireFlag, 119);
-           TABuf_Tx[TA_INDEX_DAT+1] = '0';//발생..
-        }
-        else
-        {
-           FireOccurrence = 99;//화재인데 화재작동 안하는 경우는 여기에 해당함.. 노말모드로..
-           TABuf_Tx[TA_INDEX_DAT+1] = '3';//발생안시킴..
-        }
+      else if (TABuf_Rx[TA_INDEX_DAT+0] == '2')
+      { //화재시 LOCK 작동하게.. 화재 무드 무시
+        FireLockFlag = 99;//화재작동모드 0, 화재시비작동모드 99
         TABuf_Tx[TA_INDEX_DAT+0] = '0';//성공~
-#else
-        TABuf_Tx[TA_INDEX_DAT+0] = '0';//성공~
-        TABuf_Tx[TA_INDEX_DAT+1] = '3';//발생안시킴..
-#endif
+        TABuf_Tx[TA_INDEX_DAT+1] = '2';//화재 LOCK 작동 모드 변경완료..
       }
-      else if (TABuf_Rx[TA_INDEX_DAT+0] == '8')
-      { //화재시 LOCK 작동하게.. 일반모드로..
-        if(FireOccurrence > 0)
-        {// 1 또는 99일 떄는 화재모드이므로.. == TRUE){
-           FireOccurrence = TRUE;
-           EEPROMSetData((INT16U) EEPROM_ADDRESS_FireFlag, 119);
-        }
-        else
-        {
-           EEPROMSetData((INT16U)(EEPROM_ADDRESS_FireFlag), 0);//eeprom 화재신호 지우기..
-        }
-        FireLockFlag = 0;//화재작동모드 0, 화재시비작동모드 99
+      else if (TABuf_Rx[TA_INDEX_DAT+0] == '3')
+      { //화재시 LOCK 작동하지 않게 모드 변경..원래 대로 복귀
+        FireLockFlag = 0;//화재인데 화재작동 안하는 경우는 여기에 해당함.. 노말모드로..
         TABuf_Tx[TA_INDEX_DAT+0] = '0';//성공~
-        TABuf_Tx[TA_INDEX_DAT+1] = '8';//화재 LOCK 작동 모드 변경완료..
-      }
-      else if (TABuf_Rx[TA_INDEX_DAT+0] == '9')
-      { //화재시 LOCK 작동하지 않게 모드 변경..
-        FireLockFlag = 99;//화재인데 화재작동 안하는 경우는 여기에 해당함.. 노말모드로..
-        if(FireOccurrence > 0 )
-           FireOccurrence = 99; // 화재비작동모드로 들어갔으므로..
-        EEPROMSetData((INT16U) EEPROM_ADDRESS_FireFlag, 99);//화재작동안함(99)이 아닐 경우
-        TABuf_Tx[TA_INDEX_DAT+0] = '0';//성공~
-        TABuf_Tx[TA_INDEX_DAT+1] = '9';//화재 LOCK 비작동 모드 변경완료..
+        TABuf_Tx[TA_INDEX_DAT+1] = '3';//화재 LOCK 비작동 모드 변경완료..
       }
       else
       {//'1' 복구명령인데 화재상태가 아닌 경우
@@ -1248,7 +1276,8 @@ void TAPacketAnalysis(void)
       break;
     }
   }
-  TAMakeResponsePacket( ProtocolType);
+//  if( ProtocolType != TA_StrCmdCheckAcuStatus) // 계속 응답을 함.
+	  TAMakeResponsePacket( ProtocolType);
 }
 
 
@@ -1300,15 +1329,18 @@ INT8U TACheckJumperSetting( void)
   return nPort;
 }
 
-void TAMakeResponsePacket( INT16U SendCommand)  {
+void TAMakeResponsePacket( INT16U SendCommand)
+{
   INT16U i;
     
   INT16U CrcXor = 0, len;
 
   TABuf_Tx[TA_INDEX_HDR] = TA_HEADER_TA_MSG; //0     AA
   TABuf_Tx[TA_INDEX_STX] = TA_MSGE_STX;      //1     02
-  TABuf_Tx[TA_INDEX_ADDR] = gU8ACUnum;        //2     TABuf_Rx[TA_INDEX_ADDR];  //2   01
+  TABuf_Tx[TA_INDEX_ADDR] = gU8ACUnum;       //2     TABuf_Rx[TA_INDEX_ADDR];  //2   01
 
+  if( SendCommand != TA_StrCmdCheckAcuStatus) // 계속 응답을 함.
+	  len = 0;
   len = TAGetPacketLength( SendCommand);
   TABuf_Tx[TA_INDEX_LENH] = len/256;  //3
   TABuf_Tx[TA_INDEX_LENL] = len%256;  //4
@@ -1326,15 +1358,16 @@ void TAMakeResponsePacket( INT16U SendCommand)  {
   GVTAComData.SetPacket = TRUE;
 }
 
-INT16U TAGetPacketLength( INT16U SendCommand) {
+INT16U TAGetPacketLength( INT16U SendCommand)
+{
    INT16U uLength = 0;
    
    switch(SendCommand) {
    case  TA_StrCmdCheckAcuStatus:      //   0x4141  //  ("AA")  //  ACU의 통신 상태 확인
-        uLength = 16;   //9 + 7
+        uLength = 12 ;   //5 + 7
         break;
     case  TA_StrCmdSetAcuTime:      //   0x4142  //  ("AB")  //  ACU의 시간설정.
-        uLength = 15;   //4 + 7 + 4바이트 추가 -> gU16EEpromFailCount = 0;//EEPROM sFalsh 쓰기읽기 실패 카운트... 시간정보보낼때 주간값에 추가해서 보냄...// 0x4142  //	("AB")
+        uLength = 15;   //4 + 7 + 4 바이트 추가 -> gU16EEpromFailCount = 0;//EEPROM sFalsh 쓰기읽기 실패 카운트... 시간정보보낼때 주간값에 추가해서 보냄...// 0x4142  //	("AB")
         break;
     case  TA_StrCmdCheckAcuTime:      //    0x4143  //  ("AC")  //  ACU의 시간설정 확인..
         uLength = 15;   //6 + 7
@@ -1362,18 +1395,28 @@ INT16U TAGetPacketLength( INT16U SendCommand) {
      case  TA_StrCmd485Status:      //    0x5452  //  ("RT")  //  485 설정 확인.
          uLength =  23;// 16 + 7
      	 break;
-    case  TA_StrCmdResetAcu:      //    0x4144  //  ("AD")  //  ACU의 초기화.
+     case  TA_StrCmdCheckIDsg:      //    0x4943  //  ("IC")  //  ID자료 개별 내용 확인.
+         uLength =  20;// 13 + 7
+     	 break;
+     case TA_StrCmdCheckIDCnt:      //    0x4946  //  ("IF")  //  ID자료 등록 건수 확인.
+         uLength =  12;// 5 + 7
+     	 break;
+     case TA_StrCmdGetIDContent:	//    0x494C  //  ("IL")  //  ID자료 등록 메모리 내용 확인.
+         uLength =  258;// 251 + 7
+     	 break;
+     case  	TA_StrCmdLogDisp:
+		 uLength =  39;// 32 + 7
+		 break;
+		case  TA_StrCmdResetAcu:      //    0x4144  //  ("AD")  //  ACU의 초기화.
     case  TA_StrCmdAcuReboot  :    //0x4146  //  ("AF")  //  ACU의 reboot
     case  TA_StrCmdAcuSetting:    //        0x4153  //  ("AS")  //  ACU Setting
     case  TA_StrCmdSetIDsg:      //    0x4941  //  ("IA")  //  ID자료 개별 저장.
     case  TA_StrCmdSetIDblocksg :    // 0x4942  //  ("IB")  //  ID자료 블럭 저장 (블럭을 통채로 대체하는 방식
-    case  TA_StrCmdCheckIDsg:      //    0x4943  //  ("IC")  //  ID자료 개별확인.
     case  TA_StrCmdDeleteIDsg:      //    0x4944  //  ("ID")  //  ID자료 개별 삭제. 
     case  TA_StrCmdDeleteIDAll:      //    0x4945  //  ("IE")  //  ID자료 전체 삭제. 
     case  TA_StrCmdSetApbID:      //    0x4947  //  ("IG")  //  ID자료 Anti-passback 설정.
     case  TA_StrCmdCheckApbID:      //    0x4948  //  ("IH")  //  ID자료 Anti-passback 설정 확인.
     case  TA_StrCmdDeleteIDBlock: 	// 0x494A  //	("IJ")  //  ID자료 특정블럭만 삭제. 
-    case  TA_StrCmdCheckIDCnt:      //    0x4946  //  ("IF")  //  ID자료 등록 건수 확인.
     case  TA_StrCmdInitApbIDAll:      //    0x4949  //  ("II")   //  ID자료 Anti-passback 전체 초기화.
     case  TA_StrCmdSetDoorZone:      //    0x4441  //  ("DA")  //  DOOR ZONE 개별 설정.
     case  TA_StrCmdChkDoorzone:      //  0x4442  //  ("DB")  //  DOOR ZONE 개별 확인. 
@@ -1536,67 +1579,66 @@ void UdpSetDNSServer(void)
 ******************************************************************************/
 void UdpServerProcess(void)
 {
-  static INT8U UdpServerProcessTimer = 0;
-  static INT16U UDPResetCounter = 0;
+	static INT8U UdpServerProcessTimer = 0;
+	static INT16U UDPResetCounter = 0;
 
-  INT8U Step_Result = FALSE;
-  INT16U Recv_len = 0;
-  
-  if(UdpServerProcessTimer++ < 2)
-	  return; //every 20ms
-  UdpServerProcessTimer = 0;
-  
-  switch(UDP_Step)
-  {
-    case UDP_Start:
+	INT8U Step_Result = FALSE;
+	INT16U Recv_len = 0;
+
+	if(UdpServerProcessTimer++ < 2)
+		return; //every 20ms
+	UdpServerProcessTimer = 0;
+
+	switch(UDP_Step)
 	{
-      UDPResetCounter = 0;
-      EthernetSocketDisconnect(Socket_FIRE);
-      EthernetSocketClose(Socket_FIRE);
-      
-      rprintf("UDP: UDP Process Start...\r\n");
-      UDP_Step = UDP_Init;
-      break;
+	case UDP_Start:
+	{
+		UDPResetCounter = 0;
+		EthernetSocketDisconnect(Socket_FIRE);
+		EthernetSocketClose(Socket_FIRE);
+
+		rprintf("UDP: UDP Process Start...\r\n");
+		UDP_Step = UDP_Init;
+		break;
 	}
-  	case UDP_Init:
+	case UDP_Init:
 	{
 	  Step_Result = UdpProcess(Socket_FIRE, UDP_Init); // Read Status
-      switch (Step_Result)
-      {
-      case SOCK_UDP:
-        UDP_Step = UDP_Receive;
-        UDPResetCounter = 0;
-        break;
-      case SOCK_CLOSED:          /* if a socket is closed */
-        Step_Result = UdpProcess(Socket_FIRE, UDP_Open);
-        UDPResetCounter = 0;
-        rprintf("UDP: %d : UDP Started. port : %d...\r\n", Socket_FIRE, UDP_SRV_PORT_FIRE );
-        break;
-      }
-      if(UDPResetCounter++ > 1200)   // 10mSec * 1200 * 20mSec  = 240Sec
-      {
-        UDPResetCounter = 0;
-        rprintf("UDP: UDP Process Reset\r\n");
-        UDP_Step = UDP_Start;
-      }
-      break;
+	  switch (Step_Result)
+	  {
+	  case SOCK_UDP:
+		UDP_Step = UDP_Receive;
+		UDPResetCounter = 0;
+		break;
+	  case SOCK_CLOSED:          /* if a socket is closed */
+		Step_Result = UdpProcess(Socket_FIRE, UDP_Open);
+		UDPResetCounter = 0;
+		rprintf("UDP: %d : UDP Started. port : %d...\r\n", Socket_FIRE, UDP_SRV_PORT_FIRE );
+		break;
+	  }
+	  if(UDPResetCounter++ > 1200)   // 10mSec * 1200 * 20mSec  = 240Sec
+	  {
+		UDPResetCounter = 0;
+		rprintf("UDP: UDP Process Reset\r\n");
+		UDP_Step = UDP_Start;
+	  }
+	  break;
 	}
-    case UDP_Send:
+	case UDP_Send:
 	{
-      if (UdpProcess(Socket_FIRE, UDP_Send) == TRUE)
-        rprintf("UDP: UDP Send Success...\r\n");
-      UDP_Step = UDP_Init;
-      break;
-  	}
-    case UDP_Receive:
+		if (UdpProcess(Socket_FIRE, UDP_Send) == TRUE)
+			rprintf("UDP: UDP Send Success...\r\n");
+		UDP_Step = UDP_Init;
+		break;
+	}
+	case UDP_Receive:
 	{
-      Recv_len = UdpProcess(Socket_FIRE, UDP_Receive);
-      if( (Recv_len != 0xFF) && (Recv_len > 0) )
-      {
-        rprintf("UDP: UDP Receive (%d) Success [%s].\r\n", Recv_len, udp_recv_buffer);
-        if( strncmp((const char *)udp_recv_buffer , "Fire!", 5) == 0)
-        {
-#ifdef ENABLE_FIRE_ANNOUNCE  //udp 로 화재 전파기능이 있을 때..
+	  Recv_len = UdpProcess(Socket_FIRE, UDP_Receive);
+	  if( (Recv_len != 0xFF) && (Recv_len > 0) )
+	  {
+		rprintf("UDP: UDP Receive (%d) Success [%s].\r\n", Recv_len, udp_recv_buffer);
+		if( strncmp((const char *)udp_recv_buffer , "Fire!", 5) == 0)
+		{
 			if(FireLockFlag != 99)
 			{  //EEPROMGetData((INT16U) EEPROM_ADDRESS_FireFlag) != 99){//화재작동안함(99)이 아닐 경우
 				FireOccurrence = TRUE;
@@ -1604,10 +1646,12 @@ void UdpServerProcess(void)
 			}
 			else
 			{
-				FireOccurrence = 99;//화재인데 화재작동 안하는 경우는 여기에 해당함.. 노말모드로..
+				FireOccurrence = 99; //화재인데 화재작동 안하는 경우는 여기에 해당함.. 노말모드로..
 			}
 
-			if( httpc_isConnected)  // http 서버 모드 이면 httpclient로 접속에서 연결되었으면 보내는 걸로 바꿈.
+#ifdef ENABLE_FIRE_ANNOUNCE  //udp 로 화재 전파기능이 있을 때..
+
+	//			if( httpc_isConnected)  // http 서버 모드 이면 httpclient로 접속에서 연결되었으면 보내는 걸로 바꿈.
 			{
 				HTTP_MakeHttpPacketRtLog( 0, HTTP_EVENT_FIRE_CODE, HTTP_VERIFYTYPE_EVENT, Result_OK);
 			}
@@ -1619,55 +1663,54 @@ void UdpServerProcess(void)
 
 				TAMakeResponsePacket(TA_StrCmdGetEvent);//TA_StrCmdGetEvent  0x4542  //  ("EB")  //  EVENT UPLOAD
 			}
-          
 #endif
 			rprintf("UDP: Set Fire %s\r\n", udp_recv_buffer);
-        }
-        else if( strncmp((const char *)udp_recv_buffer , "GetMc", 5) == 0)
-        {
-          TANeedUdpCheck = TRUE;
-          SSDPReportMyMAC();
-          rprintf("UDP: Requested MAC From %d:%d:%d:%d port %d.\r\n", recv_addr[0], recv_addr[1], recv_addr[2], recv_addr[3], recv_port);
-        }
-        else if( strncmp(udp_recv_buffer , "GetIp", 5) == 0)
-        {
-          TANeedUdpCheck = TRUE;
-          SSDPReportMyIp();
-          rprintf("UDP: Requested IP From %d:%d:%d:%d port %d.\r\n", recv_addr[0], recv_addr[1], recv_addr[2], recv_addr[3], recv_port);
-        }
-        else if( strncmp((const char *)udp_recv_buffer , "SetIp", 5) == 0)
-        {
-/*          if( (udp_recv_buffer[5] == CMSParameter.IPAddress[0]) &&
-              (udp_recv_buffer[6] == CMSParameter.IPAddress[1]) &&
-              (udp_recv_buffer[7] == CMSParameter.IPAddress[2]) &&
-              (udp_recv_buffer[8] == CMSParameter.IPAddress[3]) )
-          {*/
-            TANeedUdpCheck = TRUE;
-            SSDPSetMyIp();
-            rprintf("UDP: Requested Set Same TA %d.%d.%d.%d port %d.\r\n", recv_addr[0], recv_addr[1], recv_addr[2], recv_addr[3], recv_port);
+		}
+		else if( strncmp((const char *)udp_recv_buffer , "GetMc", 5) == 0)
+		{
+		  TANeedUdpCheck = TRUE;
+		  SSDPReportMyMAC();
+		  rprintf("UDP: Requested MAC From %d:%d:%d:%d port %d.\r\n", recv_addr[0], recv_addr[1], recv_addr[2], recv_addr[3], recv_port);
+		}
+		else if( strncmp(udp_recv_buffer , "GetIp", 5) == 0)
+		{
+		  TANeedUdpCheck = TRUE;
+		  SSDPReportMyIp();
+		  rprintf("UDP: Requested IP From %d:%d:%d:%d port %d.\r\n", recv_addr[0], recv_addr[1], recv_addr[2], recv_addr[3], recv_port);
+		}
+		else if( strncmp((const char *)udp_recv_buffer , "SetIp", 5) == 0)
+		{
+	/*          if( (udp_recv_buffer[5] == CMSParameter.IPAddress[0]) &&
+			  (udp_recv_buffer[6] == CMSParameter.IPAddress[1]) &&
+			  (udp_recv_buffer[7] == CMSParameter.IPAddress[2]) &&
+			  (udp_recv_buffer[8] == CMSParameter.IPAddress[3]) )
+		  {*/
+			TANeedUdpCheck = TRUE;
+			SSDPSetMyIp();
+			rprintf("UDP: Requested Set Same TA %d.%d.%d.%d port %d.\r\n", recv_addr[0], recv_addr[1], recv_addr[2], recv_addr[3], recv_port);
 
- //       	NVIC_SystemReset();	// System Reset
- /*         }
-          else 
-          {
-            rprintf("UDP: Requested Set another TA %d.%d.%d.%d.\r\n", udp_recv_buffer[5], udp_recv_buffer[6], udp_recv_buffer[7], udp_recv_buffer[8]);
-          }*/
-        }
+	//       	NVIC_SystemReset();	// System Reset
+	/*         }
+		  else
+		  {
+			rprintf("UDP: Requested Set another TA %d.%d.%d.%d.\r\n", udp_recv_buffer[5], udp_recv_buffer[6], udp_recv_buffer[7], udp_recv_buffer[8]);
+		  }*/
+		}
 		else if( strncmp((const char *)udp_recv_buffer , "SetSrv", 6) == 0)
 		{
 			UdpSetDNSServer();
 			TANeedUdpCheck = TRUE;
 			rprintf("UDP: Requested Set IP From %d:%d:%d:%d port %d.\r\n", recv_addr[0], recv_addr[1], recv_addr[2], recv_addr[3], recv_port);
 		}
-        else 
-        {
-          rprintf("UDP: Requested Unknown data.\r\n");
-        }
-      }
-      UDP_Step = UDP_Send;
-      break;
+		else
+		{
+		  rprintf("UDP: Requested Unknown data.\r\n");
+		}
+	  }
+	  UDP_Step = UDP_Send;
+	  break;
 	}
-  }
+	}
 }
 
 /**

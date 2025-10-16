@@ -1,0 +1,4 @@
+../User/Src/vixDebugConsole.c:36:1:__io_getchar	1
+../User/Src/vixDebugConsole.c:45:1:__io_putchar	1
+../User/Src/vixDebugConsole.c:51:5:_write	1
+../User/Src/vixDebugConsole.c:69:6:OPEN_DebugConsole	1

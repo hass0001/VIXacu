@@ -1,0 +1,9 @@
+../W6100Lib/Src/CS74x_Queue.c:18:6:QUEUE_Init_Ring_Queues	4	static
+../W6100Lib/Src/CS74x_Queue.c:31:6:QUEUE_En_Cs_Queue	16	static
+../W6100Lib/Src/CS74x_Queue.c:76:13:QUEUE_De_Cs_Queue	24	static
+../W6100Lib/Src/CS74x_Queue.c:137:6:QUEUE_Cls_Cs_Queue	16	static
+../W6100Lib/Src/CS74x_Queue.c:162:5:QUEUE_Cnt_Cs_Queue	24	static
+../W6100Lib/Src/CS74x_Queue.c:209:6:QUEUE_En_Rt_Queue	16	static
+../W6100Lib/Src/CS74x_Queue.c:220:15:QUEUE_De_Rt_Queue	16	static
+../W6100Lib/Src/CS74x_Queue.c:237:6:QUEUE_Cls_Rt_Queue	4	static
+../W6100Lib/Src/CS74x_Queue.c:243:5:QUEUE_Cnt_Rt_Queue	16	static

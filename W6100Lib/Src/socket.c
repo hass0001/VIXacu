@@ -217,6 +217,7 @@ int8_t listen(uint8_t sn)
 
 int8_t connect(uint8_t sn, uint8_t * addr, uint16_t port, uint8_t addrlen)
 { 
+	uint16_t cntWait = 0;
 
    CHECK_SOCKNUM();
    CHECK_TCPMODE();
@@ -243,7 +244,13 @@ int8_t connect(uint8_t sn, uint8_t * addr, uint16_t port, uint8_t addrlen)
       setSn_DIPR(sn,addr);
       setSn_CR(sn,Sn_CR_CONNECT);
    }
-   while(getSn_CR(sn));
+   while(getSn_CR(sn))
+	{
+	 cntWait++;
+	 if( cntWait > 5000)
+		 break;
+	}
+cntWait = 0;
 
    if(sock_io_mode & (1<<sn)) return SOCK_BUSY;
 

@@ -96,10 +96,10 @@ typedef struct _ETH_IPv4NetInfoTypeDef {
 } __attribute__((packed)) ETH_IPv4NetInfoTypeDef;
 
 typedef struct _HTTP_ClientCommTypeDef {
-	uint8_t HeaderBuf[512];
-	uint8_t BodyBuf[1024];
-	uint8_t TxBuf[4096];
-	uint8_t RxBuf[4096];
+	uint8_t HdBuf[512];
+	uint8_t BdBuf[512];
+	uint8_t TxBuf[1024];
+	uint8_t RxBuf[2048];
 } __attribute__((packed)) HTTP_ClientCommTypeDef;
 
 void nRST_w6100(void);

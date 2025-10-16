@@ -1,0 +1,13 @@
+../Drivers/CMSIS/Include/core_cm4.h:1933:34:__NVIC_SystemReset	4	static,ignoring_inline_asm
+../W6100Lib/Src/httpUtil.c:28:9:http_get_cgi_handler	32	static
+../W6100Lib/Src/httpUtil.c:52:9:http_post_cgi_handler	32	static
+../W6100Lib/Src/httpUtil.c:78:6:HTTPC_OldDecodeTime	16	static
+../W6100Lib/Src/httpUtil.c:89:10:HTTPC_GetSecFromDateTime	24	static
+../W6100Lib/Src/httpUtil.c:106:6:CmdSetOptionDateTime	4	static
+../W6100Lib/Src/httpUtil.c:115:9:A2H	16	static
+../W6100Lib/Src/httpUtil.c:127:6:parseDurString	40	static
+../W6100Lib/Src/httpUtil.c:151:6:Httpc_TreatUpgrade	40	static
+../W6100Lib/Src/httpUtil.c:208:6:Httpc_TreatControlDevice	40	static
+../W6100Lib/Src/httpUtil.c:323:6:Httpc_TreatDataDelete	96	static
+../W6100Lib/Src/httpUtil.c:407:6:Httpc_TreatSetOption	48	static
+../W6100Lib/Src/httpUtil.c:467:6:Httpc_TreatDataUpdate	272	static

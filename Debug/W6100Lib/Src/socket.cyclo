@@ -1,0 +1,13 @@
+../W6100Lib/Src/socket.c:101:8:socket	30
+../W6100Lib/Src/socket.c:186:8:close	4
+../W6100Lib/Src/socket.c:204:8:listen	5
+../W6100Lib/Src/socket.c:218:8:connect	16
+../W6100Lib/Src/socket.c:272:8:disconnect	8
+../W6100Lib/Src/socket.c:295:12:send	16
+../W6100Lib/Src/socket.c:348:12:recv	9
+../W6100Lib/Src/socket.c:382:12:sendto	16
+../W6100Lib/Src/socket.c:451:12:recvfrom	18
+../W6100Lib/Src/socket.c:538:8:ctlsocket	17
+../W6100Lib/Src/socket.c:586:8:setsockopt	15
+../W6100Lib/Src/socket.c:630:8:getsockopt	24
+../W6100Lib/Src/socket.c:699:9:peeksockmsg	6

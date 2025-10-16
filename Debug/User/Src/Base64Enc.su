@@ -1,0 +1,4 @@
+../User/Src/Base64Enc.c:26:7:base64_encode	56	static
+../User/Src/Base64Enc.c:56:16:base64_decode	56	static
+../User/Src/Base64Enc.c:92:6:build_decoding_table	16	static
+../User/Src/Base64Enc.c:101:6:base64_cleanup	8	static

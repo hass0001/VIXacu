@@ -22,7 +22,7 @@ typedef struct _HTTPC_GetPostTypeDef {
 
 
 // HTTP client debug message enable
-//#define _HTTPCLIENT_DEBUG_
+
 
 // Data buffer size
 #ifndef DATA_BUF_SIZE
@@ -105,46 +105,21 @@ typedef struct _HTTPC_GetPostTypeDef {
 #define _SN_BYTE_LEN						6
 #define _COOKIE_BYTE_LEN					16
 
-typedef struct __rtLog {
-	uint8_t pin[16];
-	uint8_t cardno[10];  // decimal 은 10 자리 까지
-	uint8_t sitecode;
-	uint8_t linkid;
-	uint8_t eventaddr;
-	uint8_t event;
-	uint8_t verifytype;
-	uint8_t index;
-	uint8_t maskflag;
-	uint8_t attstate;
-} __attribute__((packed)) stRtLog;
-
-#if 1
-typedef struct __HttpRequest {
-	uint8_t * method;
-	uint8_t * uri;
-	uint8_t* sn;
-	uint8_t* http_ver;
-	uint8_t* cookie;
-	uint8_t * host;
-	uint8_t* user_agent;
-	uint8_t* connection;
-	uint8_t* accept;
-	uint8_t* accept_charset;
-	uint8_t* accept_language;
-	uint8_t* content_language;
-	uint8_t * content_type;
-	uint32_t content_length;
-} __attribute__((packed)) HttpRequest;
-#else
-typedef struct __HttpRequest {
-	uint8_t * method;
-	uint8_t * uri;
-	uint8_t * host;
-	uint8_t * content_type;
-	uint8_t * connection;
-	uint32_t content_length;
-} __attribute__((packed)) HttpRequest;
-#endif
+typedef union {
+	struct __rtLog {
+		uint8_t pin[9];
+		uint8_t cardno[8];  // hexdecimal 은 8 자리 까지
+		uint8_t sitecode;
+		uint8_t linkid;
+		uint8_t eventaddr;
+		uint8_t event;
+		uint8_t verifytype;
+		uint8_t index;
+		uint8_t maskflag;
+		uint8_t attstate;
+	} __attribute__((packed)) stRtLog;
+	 uint8_t u8rtLogParam[25];
+}unionRtLog_Parameter;
 
 // cdata table tablename ////////
 #define CTABLE_RTLOG	1
@@ -169,14 +144,14 @@ extern uint8_t  httpc_isConnected;
 extern uint16_t httpc_isReceived;
 
 // extern: HTTP request structure
-extern HttpRequest request;
+//extern HttpRequest request;
 
 /*********************************************
 * HTTP Client Functions
 *********************************************/
 uint8_t  httpc_connection_handler(uint8_t addr_len); // HTTP client socket handler - for main loop, implemented in polling
 
-uint8_t  httpc_init(uint8_t sock, uint8_t * ip, uint16_t port, uint8_t * sbuf, uint8_t * rbuf); // HTTP client initialize
+uint8_t  httpc_init(uint8_t sock, uint8_t * ip, uint16_t port, uint8_t * sbuf, uint8_t * rbuf,  uint8_t * hbuf, uint8_t * bbuf); // HTTP client initialize
 uint8_t  httpc_connect(uint8_t addrlen); // HTTP client connect (after HTTP socket opened)
 uint8_t  httpc_disconnect(void);
 uint16_t httpc_recv(uint8_t * buf, uint16_t len); // Receive the HTTP response header and body, User have to parse the received messages depending on needs

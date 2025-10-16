@@ -1,0 +1,3 @@
+../Core/Src/dma.c:39:6:MX_DMA_Init	1
+../Core/Src/dma.c:58:6:HAL_UART_TxCpltCallback	2
+../Core/Src/dma.c:66:9:DMA_IsTxComplete	2

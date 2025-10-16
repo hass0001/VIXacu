@@ -28,6 +28,7 @@
 #define FWD_TYP_SET_TIME (0x45)
 #define FWD_TYP_SET_PSN (0x46)
 #define FWD_TYP_CLEAR_CARD (0x47)
+#define FWD_TYP_GET_VERSION (0x48)
 
 #define ATE_TYP_READY (0x50)
 #define ATE_TYP_FIRMWARE (0x51)

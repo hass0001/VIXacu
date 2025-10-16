@@ -1,0 +1,16 @@
+../User/Src/RTC_Proc.c:41:6:RTC_Initial	8	static
+../User/Src/RTC_Proc.c:47:9:GetDaysOfLeapMonth	16	static
+../User/Src/RTC_Proc.c:93:9:GetWeekDay	16	static
+../User/Src/RTC_Proc.c:118:6:ApplyToDay	16	static
+../User/Src/RTC_Proc.c:145:7:RTC_GetGmtDate	56	static
+../User/Src/RTC_Proc.c:174:6:SetToDay	16	static
+../User/Src/RTC_Proc.c:185:9:RTC_GetDaysOfLeapMonthF	24	static
+../User/Src/RTC_Proc.c:202:9:RTC_GetWeekDayF	24	static
+../User/Src/RTC_Proc.c:227:6:RTC_ApplyToDayF	16	static
+../User/Src/RTC_Proc.c:243:6:RTC_AdjustSetSequence	24	static
+../User/Src/RTC_Proc.c:278:6:RTC_SetTimeAndDate	16	static
+../User/Src/RTC_Proc.c:299:6:RTC_GetTimeAndDate	16	static
+../User/Src/RTC_Proc.c:312:9:BIN_BCD	24	static
+../User/Src/RTC_Proc.c:321:9:BCD_BIN	24	static
+../User/Src/RTC_Proc.c:329:9:INT_ASCII_LO	16	static
+../User/Src/RTC_Proc.c:334:9:INT_ASCII_HI	16	static
